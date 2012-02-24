@@ -5,6 +5,7 @@ import std.stdio;
 import utils : filter;
 import mod;
 import config;
+import ini;
 
 void main() {
     version(unittest) {
@@ -24,17 +25,16 @@ void main() {
             init_dabble_conf(root_dir);
         }
     }
-    Config config = new Config(root_dir);
-    config.read_config();
-    scope(exit) config.write_config();
-    debug writeln("Project name: ", config.get("core", "name"));
+    IniData config = get_dabble_conf(root_dir);
+    scope(exit) write_dabble_conf(config, root_dir);
+    debug writeln("Project name: ", get(config, "core", "name"));
 
     string src_dir;
-    if (config.get("core", "src_dir") == "") {
+    if (get(config, "core", "src_dir") == "") {
         src_dir = find_src_dir(root_dir);
-        config.set("core", "src_dir", relativePath(src_dir, root_dir));
+        set(config, "core", "src_dir", relativePath(src_dir, root_dir));
     } else
-        src_dir = absolutePath(config.get("core", "src_dir"), root_dir);
+        src_dir = absolutePath(get(config, "core", "src_dir"), root_dir);
     debug writeln("Source: ", src_dir);
     
     auto df_iter = dirEntries(src_dir, SpanMode.depth);
