@@ -1,15 +1,21 @@
 import std.stdio;
+import std.file;
 import std.regex : match;
 import std.algorithm : equal;
 import std.array : split, join;
 import std.path;
+import std.datetime;
 
 import utils : filter;
+import ini;
 
 class Module {
 public:
     string package_name;
     string filename;
+    string mod_file;
+
+    SysTime last_built;
     
     Module[] imported;
     Module[] imports;
@@ -18,9 +24,10 @@ public:
 
     /* Takes the filename of the module (For identification purpouses only, the
        file will not be read from disk */
-    this(string filename, string src_path) {
+    this(string filename, string src_path, string root_path) {
         this.filename = filename;
         this.package_name = get_package_name(filename, src_path);
+        this.mod_file = buildPath(root_path, ".dabble", "modules", package_name);
     }
 
     // Returns true if there is a cycle in the imports. Must be called on root
@@ -149,6 +156,25 @@ casds {};
 
         assert(test.has_imported(testing) && foo_bar.has_imported(testing),
                "Module.parse_imports did not reflect parsed relationships");
+    }
+
+    bool has_mod_file() {
+        return exists(this.mod_file) && isFile(this.mod_file);
+    }
+
+    void read_mod_file() {
+        IniData data = read_ini(this.mod_file);
+        if (get(data, "build", "last_built") != "") {
+            auto ftime = SysTime.fromISOString(get(data, "build", "last_built"));
+            if (ftime > this.last_built)
+                this.last_built = ftime;
+        }
+    }
+
+    void write_mod_file() {
+        IniData data;
+        data["build"]["last_built"] = this.last_built.toISOString();
+        write_ini(data, this.mod_file);
     }
 }
 

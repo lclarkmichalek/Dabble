@@ -41,7 +41,7 @@ void main() {
     Module[string] modules;
     foreach(string fn; df_iter)
         if (extension(fn) == ".d") {
-            auto mod = new Module(fn, src_dir);
+            auto mod = new Module(fn, src_dir, root_dir);
             modules[mod.package_name] = mod;
         }
     debug writeln("Modules: ", modules);
