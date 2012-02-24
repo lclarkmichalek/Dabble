@@ -42,6 +42,8 @@ void main() {
     foreach(string fn; df_iter)
         if (extension(fn) == ".d") {
             auto mod = new Module(fn, src_dir, root_dir);
+            if (mod.has_mod_file())
+                mod.read_mod_file();
             modules[mod.package_name] = mod;
         }
     debug writeln("Modules: ", modules);
@@ -51,6 +53,9 @@ void main() {
     
     Module[string] roots = find_roots(modules);
     debug writeln("Roots: ", roots);
+
+    foreach(mod; modules.values)
+        mod.write_mod_file();
 }
 
 string find_root_dir() {
