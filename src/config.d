@@ -29,7 +29,7 @@ public:
 
     private {
         string ini_header = r"^\[[\w _\d]+\]$";
-        string ini_value = r"^\w+\s*=\s*\w+";
+        string ini_value = r"^[\w_]+\s*=\s*[\w_]+";
     }
     void read_config(string filename="") {
         // YAIP
