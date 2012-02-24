@@ -16,6 +16,7 @@ public:
     string mod_file;
 
     SysTime last_built;
+    SysTime last_parsed; // Last time we parsed imports from the file
     
     Module[] imported;
     Module[] imports;
@@ -27,6 +28,8 @@ public:
     this(string filename, string src_path, string root_path) {
         this.last_built = Clock.currTime();
         this.last_built.stdTime(0); // set to 0 if never built
+        this.last_parsed = Clock.currTime();
+        this.last_parsed.stdTime(0); // set to 0 if never parsed
         
         this.filename = filename;
         this.package_name = get_package_name(filename, src_path);
@@ -111,12 +114,20 @@ public:
                 return true;
         return false;
     }
+
+    bool requires_reparse() {
+        return timeLastModified(this.filename) > this.last_parsed;
+    }
+    bool requires_rebuild() {
+        return timeLastModified(this.filename) > this.last_built;
+    }
     
     private {
         string import_regex = r"^\s*import\s+([\w_]+\.)*[\w_]+(\s*:\s*([\w_]+\s*,\s*)*[\w_]+)?\s*;$";
         string package_regex = r"([\w_]+\.)*[\w_]+";
     }
-    void parse_imports(File file, Module[string] modules) {
+    void parse_imports(Module[string] modules) {
+        auto file = File(this.filename, "r");
         foreach(cline; file.byLine()) {
             string line = cast(string)cline.dup;
             if (match(line, this.import_regex)) {
@@ -131,6 +142,7 @@ public:
                 }
             }
         }
+        this.last_parsed = Clock.currTime();
     }
     unittest {
         auto test = new Module("/tmp/test.d", "/");
@@ -172,11 +184,17 @@ casds {};
             if (ftime > this.last_built)
                 this.last_built = ftime;
         }
+        if (get(data, "core", "last_parsed") != "") {
+            auto ftime = SysTime.fromISOString(get(data, "core", "last_parsed"));
+            if (ftime > this.last_parsed)
+                this.last_parsed = ftime;
+        }
     }
 
     void write_mod_file() {
         IniData data;
         data["build"]["last_built"] = this.last_built.toISOString();
+        data["core"]["last_parsed"] = this.last_parsed.toISOString();
         write_ini(data, this.mod_file);
     }
 }
@@ -188,13 +206,6 @@ Module[string] find_roots(Module[string] mods) {
             roots[name] = mod;
     }
     return roots;
-}
-
-void parse_files(Module[string] mods) {
-    foreach(mod; mods.byValue) {
-        auto f = File(mod.filename, "r");
-        mod.parse_imports(f, mods);
-    }
 }
 
 string get_package_name(string file, string root_dir) {

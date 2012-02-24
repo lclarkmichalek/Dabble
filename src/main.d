@@ -48,8 +48,14 @@ void main() {
         }
     debug writeln("Modules: ", modules);
 
-    // Load files into memory and parse imports
-    parse_files(modules);
+    bool dirty = false;
+    foreach(name, mod; modules) {
+        if (mod.requires_reparse()) {
+            writeln(mod.package_name, " changed, parsing imports");
+            mod.parse_imports(modules);
+            dirty = true;
+        }
+    }
     
     Module[string] roots = find_roots(modules);
     debug writeln("Roots: ", roots);
