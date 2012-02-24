@@ -4,6 +4,7 @@ import std.stdio;
 
 import utils : filter;
 import mod;
+import config;
 
 void main() {
     version(unittest) {
@@ -14,8 +15,14 @@ void main() {
 
     if (!root_found) {
         root_dir = guess_root_dir();
-        writeln("Initializing new Dabble project in ", root_dir);
-        init_root(root_dir);
+        if (!dot_dabble_exists(root_dir)) {
+            writeln("Creating new .dabble directory in ", root_dir);
+            init_dot_dabble(root_dir);
+        }
+        if (!dabble_conf_exists(root_dir)) {
+            writeln("Creating new .dabble.conf file in ", root_dir);
+            init_dabble_conf(root_dir);
+        }
     }
     debug writeln("Root: ", root_dir);
 
@@ -79,14 +86,6 @@ string guess_root_dir() {
     return absolutePath(max_name);
 }
 
-void init_root(string root) {
-    string dabblef = buildPath(root, ".dabble");
-    mkdir(dabblef);
-    mkdir(buildPath(dabblef, "modules"));
-    auto config = File(buildPath(root, ".dabble.conf"), "w");
-    config.writeln("[core]");
-    config.writeln("name=", baseName(root));
-}
 
 string find_src_dir(string root) {
     auto src = buildPath(root, "src");
