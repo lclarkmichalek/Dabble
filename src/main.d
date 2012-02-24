@@ -26,12 +26,17 @@ void main() {
     }
     Config config = new Config(root_dir);
     config.read_config();
-    scope(exit) config.write_config()
+    scope(exit) config.write_config();
     debug writeln("Project name: ", config.get("core", "name"));
 
-    string src_dir = find_src_dir(root_dir);
+    string src_dir;
+    if (config.get("core", "src_dir") == "") {
+        src_dir = find_src_dir(root_dir);
+        config.set("core", "src_dir", relativePath(src_dir, root_dir));
+    } else
+        src_dir = absolutePath(config.get("core", "src_dir"), root_dir);
     debug writeln("Source: ", src_dir);
-    config.set("core", "src_dir", src_dir);
+    
     auto df_iter = dirEntries(src_dir, SpanMode.depth);
     Module[string] modules;
     foreach(string fn; df_iter)
