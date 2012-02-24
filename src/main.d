@@ -24,10 +24,14 @@ void main() {
             init_dabble_conf(root_dir);
         }
     }
-    debug writeln("Root: ", root_dir);
+    Config config = new Config(root_dir);
+    config.read_config();
+    scope(exit) config.write_config()
+    debug writeln("Project name: ", config.get("core", "name"));
 
     string src_dir = find_src_dir(root_dir);
     debug writeln("Source: ", src_dir);
+    config.set("core", "src_dir", src_dir);
     auto df_iter = dirEntries(src_dir, SpanMode.depth);
     Module[string] modules;
     foreach(string fn; df_iter)
