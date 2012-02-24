@@ -1,5 +1,5 @@
 import std.stdio;
-import std.regex : regex, match;
+import std.regex : match;
 import std.algorithm : equal;
 import std.array : split, join;
 import std.path;
@@ -103,10 +103,8 @@ public:
     }
     
     private {
-        enum import_regex =
-            regex(r"^\s*import\s+([\w_]+\.)*[\w_]+(\s*:\s*([\w_]+\s*,\s*)*[\w_]+)?\s*;$");
-        //regex(r"^import\s+([\w_]+\.)*[\w_]+;$");
-        enum package_regex = regex(r"([\w_]+\.)*[\w_]+");
+        string import_regex = r"^\s*import\s+([\w_]+\.)*[\w_]+(\s*:\s*([\w_]+\s*,\s*)*[\w_]+)?\s*;$";
+        string package_regex = r"([\w_]+\.)*[\w_]+";
     }
     void parse_imports(File file, Module[string] modules) {
         foreach(cline; file.byLine()) {
