@@ -139,11 +139,9 @@ IniData get_config() {
         root_dir = verify_root_dir(root_dir);
     }
     if (!dot_dabble_exists(root_dir)) {
-        writeln("Creating new .dabble directory in ", root_dir);
         init_dot_dabble(root_dir);
     }
     if (!dabble_conf_exists(root_dir)) {
-        writeln("Creating new .dabble.conf file in ", root_dir);
         init_dabble_conf(root_dir);
     }
     IniData config = get_dabble_conf(root_dir);
