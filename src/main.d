@@ -126,7 +126,8 @@ int main() {
 
 bool build(Module mod, IniData config) {
     writeln("Building ", mod.package_name);
-    string[] arglist = ["dmd", "-inline", "-c"];
+    string[] arglist = ["dmd", "-c"];
+    arglist ~= get_user_compile_flags(config);
     arglist ~= mod.filename;
     foreach(imported; unique(mod.all_imports()))  {
         arglist ~= imported.filename;
@@ -151,7 +152,8 @@ bool build(Module mod, IniData config) {
 
 bool link(Module mod, IniData config) {
     writeln("Linking ", mod.package_name);
-    string[] arglist = ["dmd", "-inline"];
+    string[] arglist = ["dmd"];
+    arglist ~= get_user_link_flags(config);
     foreach(imported; unique(mod.all_imports()~mod)) {
         arglist ~= object_file(config, imported);
     }

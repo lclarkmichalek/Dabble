@@ -79,3 +79,11 @@ string object_file(IniData data, Module mod) {
     return buildPath(data["internal"]["root_dir"],
                      "pkg", "obj", mod.package_name ~ ".o");
 }
+
+string get_user_compile_flags(IniData data) {
+    return get(data, "flags", "compile");
+}
+
+string get_user_link_flags(IniData data) {
+    return get(data, "flags", "link");
+}

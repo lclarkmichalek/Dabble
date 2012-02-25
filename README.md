@@ -60,3 +60,19 @@ the `foo` root module will generate an executable named `foo_bar`:
     foo=foo_bar
 
 Entries for non-root modules are ignored.
+
+### DMD configuration
+
+Dabble only currently supports dmd (no reason it couldn't support other
+compilers in the future). If you want to pass flags to dmd when it is compiling
+or linking, the `flags` section has the `compile` and `link`
+options. This example adds the `-inline` flag to both compile and
+linking, and the `-O` flag to compiling.
+
+    # .dabble.conf, flags section
+    [flags]
+    compile=-inline -O
+    link=-inline
+
+Adding flags that affect the output of object files will screw dabble
+over and is frowned upon.
