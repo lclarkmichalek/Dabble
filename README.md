@@ -12,6 +12,8 @@ directory of the project home.
 
     $ Dabble
 
+Built executables will be in `bin` and static libraries in `lib`.
+
 Dabble will then parse the source files in the src directory to generate a
 dependency tree. The results of this will then be written to the
 `.dabble/modules` directory.
