@@ -97,7 +97,7 @@ bool build(Module mod, IniData config) {
     string[] arglist = ["dmd", "-c"];
     arglist ~= get_user_compile_flags(config);
     arglist ~= mod.filename;
-    foreach(imported; unique(mod.all_imports()))  {
+    foreach(imported; unique(mod.imports))  {
         arglist ~= imported.filename;
         arglist ~= object_file(config, imported);
     }
@@ -122,7 +122,7 @@ bool link(Module mod, IniData config) {
     writeln("Linking ", mod.package_name, " as a ", mod.type);
     string[] arglist = ["dmd"];
     arglist ~= get_user_link_flags(config);
-    foreach(imported; unique(mod.all_imports()~mod)) {
+    foreach(imported; unique(mod.imports ~mod)) {
         arglist ~= object_file(config, imported);
     }
 

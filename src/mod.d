@@ -1,12 +1,13 @@
 private {
     import std.stdio;
     import std.file;
-    import std.regex : match;
+    import std.regex;
     import std.algorithm : equal;
     import std.array : split, join;
     import std.path;
     import std.datetime;
-    import std.string : strip;
+    import std.string : strip, splitLines;
+    import std.process : shell;
     
     import utils;
     import ini;
@@ -21,6 +22,7 @@ public:
     string package_name;
     string filename;
     string mod_file;
+    IniData config;
 
     SysTime last_built;
     SysTime last_parsed; // Last time we parsed imports from the file
@@ -37,7 +39,8 @@ public:
 
     /* Takes the filename of the module (For identification purpouses only, the
        file will not be read from disk */
-    this(string filename, string src_path, string root_dir) {
+    this(string filename, IniData config) {
+        this.config = config;
         this.last_built = Clock.currTime();
         this.last_built.stdTime(0); // set to 0 if never built
         this.last_parsed = Clock.currTime();
@@ -45,8 +48,9 @@ public:
         
         this.filename = filename;
         this.last_modified = timeLastModified(this.filename);
-        this.package_name = get_package_name(filename, src_path);
-        this.mod_file = buildPath(root_dir, ".dabble", "modules", package_name);
+        this.package_name = get_package_name(filename, get(config, "internal", "src_dir"));
+        this.mod_file = buildPath(get(config, "internal", "root_dir"),
+                                  ".dabble", "modules", package_name);
     }
 
     string toString() {
@@ -130,16 +134,6 @@ public:
         return false;
     }
 
-    Module[] all_imports() {
-        auto all = this.imports.dup;
-        foreach(mod; this.imports) {
-            foreach(imp; mod.all_imports())
-                if (!inside(all, imp))
-                    all ~= imp;
-        }
-        return all;
-    }
-    
     bool requires_reparse() {
         return this.last_modified > this.last_parsed || this.needs_parse;
     }
@@ -153,27 +147,33 @@ public:
             return;
         foreach(mod; imported) {
             mod.needs_rebuild = true;
-            mod.propogate_rebuild();
         }
     }
     
+    
     private {
-        string import_regex = r"^\s*import\s+([\w_]+\.)*[\w_]+(\s*:\s*([\w_]+\s*,\s*)*[\w_]+)?\s*;$";
-        string package_regex = r"([\w_]+\.)*[\w_]+";
-        string main_func_regex = r"^\s*[\w_]+\s*main\(.*";
+        //        version(Debug) {
+            string import_regex = r"^import    (\w+\.)*\w+";
+            string main_func_regex = r"^function\s+D main\s*$";
+            /*        } else {
+            enum import_regex = ctRegex!r"^import\s+([\w_]+\.)*[\w_]+\s*";
+            enum main_func_regex = ctRegex!r"^function\s+D main\s*$";
+            }*/
     }
     void parse_imports(Module[string] modules) {
-        auto file = File(this.filename, "r");
-        foreach(cline; file.byLine()) {
-            string line = strip(cast(string)cline.dup);
+        string cmdline = "dmd -v -c -of/dev/null "~this.filename~" -I" ~
+            get(config, "internal", "src_dir");
+        string output = shell(cmdline);
+        foreach(line; splitLines(output)) {
+            line = strip(line);
             if (match(line, this.main_func_regex)) {
                 this.type = MODULE_TYPE.executable;
             }
-            if (match(line, this.import_regex)) {
+            auto m = match(line, this.import_regex);
+            if (m) {
                 // Remove first 7 chars ("import ")
-                line = line[7..$];
-                auto m = match(line, this.package_regex);
-                string pkg_name = m.hit();
+                line = m.hit()[7..$];
+                string pkg_name = strip(line);
                 if (pkg_name in modules)
                     this.add_imports(modules[pkg_name]);
                 else {
@@ -182,34 +182,6 @@ public:
             }
         }
         this.last_parsed = Clock.currTime();
-    }
-    unittest {
-        auto test = new Module("/tmp/test.d", "/");
-        auto foo_bar = new Module("/tmp/foo/bar.d", "/");
-        auto mod_dict = ["test": test, "foo.bar": foo_bar];
-        string input =
-            "import foo.bar;
-import test : func;
-import external;
-asd;
-casds {};
-";
-
-        File f = File("/tmp/dabbletest", "w");
-        f.write(input);
-        f.close();
-        f = File("/tmp/dabbletest", "r");
-        
-        auto testing = new Module("/tmp/main.d", "/");
-        testing.parse_imports(f, mod_dict);
-
-        assert(testing.has_imports(test) && testing.has_imports(foo_bar),
-               "Module.parse_imports failed standard imports");
-        assert(testing.has_external_imports("external"),
-               "Module.parse_imports failed external imports");
-
-        assert(test.has_imported(testing) && foo_bar.has_imported(testing),
-               "Module.parse_imports did not reflect parsed relationships");
     }
 
     bool has_mod_file() {
@@ -280,9 +252,7 @@ Module[string] find_modules(IniData config) {
     Module[string] modules;
     foreach(string fn; df_iter)
         if (extension(fn) == ".d") {
-            auto mod = new Module(fn,
-                                  get(config, "internal", "src_dir"),
-                                  get(config, "internal", "root_dir"));
+            auto mod = new Module(fn, config);
             modules[mod.package_name] = mod;
         }
     return modules;
