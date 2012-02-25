@@ -180,8 +180,10 @@ string find_root_dir() {
     string find_root_prime(string checking) {
         if (checking == "/")
             return "";
-        if (exists(buildPath(checking, ".dabble")) && isDir(buildPath(checking, ".dabble")) ||
-            exists(buildPath(checking, ".dabble.conf") && isFile(buildPath(checking, ".dabble.conf"))))
+        if (exists(buildPath(checking, ".dabble")) &&
+            isDir(buildPath(checking, ".dabble")) ||
+            exists(buildPath(checking, ".dabble.conf")) &&
+            isFile(buildPath(checking, ".dabble.conf")))
             return checking;
         else
             return find_root_prime(buildNormalizedPath(checking, ".."));
