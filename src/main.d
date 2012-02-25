@@ -94,6 +94,17 @@ int main(string[] args) {
             }
         }
     }
+
+    string[] couldnt_build;
+    foreach(mod; modules.values) {
+        if (!mod.can_build) {
+            couldnt_build ~= relativePath(mod.filename, getcwd());
+        }
+    }
+
+    if (couldnt_build.length != 0) {
+        writeln("Couldn't build " ~ join(couldnt_build, ", "));
+    }
     
     return 0;
 }

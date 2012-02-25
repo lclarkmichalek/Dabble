@@ -9,6 +9,7 @@ private {
     import std.datetime;
     import std.string : strip, splitLines;
     import std.process : shell;
+    import std.exception : ErrnoException;
     
     import utils;
     import ini;
@@ -30,6 +31,7 @@ public:
     SysTime last_modified;
     bool needs_parse = false;
     bool needs_rebuild = false;
+    bool can_build = true;
 
     MODULE_TYPE type = MODULE_TYPE.module_;
     
@@ -140,7 +142,8 @@ public:
         return this.last_modified > this.last_parsed || this.needs_parse;
     }
     bool requires_rebuild() {
-        return this.last_modified > this.last_built || this.needs_rebuild;
+        return (this.last_modified > this.last_built || this.needs_rebuild) &&
+            this.can_build;
     }
 
     // If this module requires rebuild, then so do all the modules it depends on
@@ -155,17 +158,24 @@ public:
     
     private {
         //        version(Debug) {
-            string import_regex = r"^import    (\w+\.)*\w+";
-            string main_func_regex = r"^function\s+D main\s*$";
-            /*        } else {
+        string import_regex = r"^import    (\w+\.)*\w+";
+        string main_func_regex = r"^function\s+D main\s*$";
+        /*        } else {
             enum import_regex = ctRegex!r"^import\s+([\w_]+\.)*[\w_]+\s*";
             enum main_func_regex = ctRegex!r"^function\s+D main\s*$";
             }*/
     }
     void parse_imports(Module[string] modules) {
         string cmdline = "dmd -v -c -of/dev/null "~this.filename~" -I" ~
-            get(config, "internal", "src_dir");
-        string output = shell(cmdline);
+            get(config, "internal", "src_dir") ~ " 2>/dev/null";
+        string output;
+        try
+            output = shell(cmdline);
+        catch (ErrnoException) {
+            this.can_build = false;
+            writeln("Failed to parse ", relativePath(this.filename, getcwd()));
+            return;
+        }
         foreach(line; splitLines(output)) {
             line = strip(line);
             if (match(line, this.main_func_regex)) {
