@@ -43,8 +43,16 @@ bool bin_exists(IniData data) {
     return exists(bin) && isDir(bin);
 }
 
-string binary_location(IniData data, Module mod) {
-    return buildPath(data["internal"]["root_dir"], "bin", mod.package_name);
+string binary_location(IniData config, Module mod) {
+    string binname = mod.package_name;
+    
+    // Special case #1
+    if ("targets" in config && binname in config["targets"])
+        binname = get(config, "targets", binname);
+    else if (binname == "main")
+        binname = get(config, "core", "name", binname);
+        
+    return buildPath(config["internal"]["root_dir"], "bin", binname);
 }
 
 void init_bin(IniData data) {
