@@ -36,6 +36,10 @@ public:
         this.mod_file = buildPath(root_path, ".dabble", "modules", package_name);
     }
 
+    string toString() {
+        return this.package_name;
+    }
+
     // Returns true if there is a cycle in the imports. Must be called on root
     // module
     bool cycle_in_imports() in {
@@ -51,8 +55,6 @@ public:
                 }
                 if (cycleprime(imported, checked))
                     return true;
-                else
-                    checked ~= imported;
             }
             return false;
         }
