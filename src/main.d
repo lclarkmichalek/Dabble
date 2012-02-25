@@ -40,6 +40,8 @@ int main() {
 
     bool dirty = false;
     foreach(name, mod; modules) {
+        if (mod.has_mod_file())
+            mod.read_mod_file(modules);
         if (mod.requires_reparse()) {
             writeln(mod.package_name, " changed, parsing imports");
             mod.parse_imports(modules);
@@ -67,8 +69,6 @@ Module[string] find_modules(string src_dir, string root_dir) {
     foreach(string fn; df_iter)
         if (extension(fn) == ".d") {
             auto mod = new Module(fn, src_dir, root_dir);
-            if (mod.has_mod_file())
-                mod.read_mod_file();
             modules[mod.package_name] = mod;
         }
     return modules;

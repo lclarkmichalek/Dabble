@@ -21,7 +21,7 @@ bool dabble_conf_exists(string root) {
 }
 void init_dabble_conf(string root) {
     IniData conf;
-    set(conf, "core", "name", baseName(root));
+    conf["core"]["name"] = baseName(root);
     write_ini(conf, buildPath(root, ".dabble.conf"));
 }
 

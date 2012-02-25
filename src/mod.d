@@ -17,6 +17,7 @@ public:
 
     SysTime last_built;
     SysTime last_parsed; // Last time we parsed imports from the file
+    bool needs_parse = false;
 
     bool is_root = false;
     
@@ -120,7 +121,7 @@ public:
     }
 
     bool requires_reparse() {
-        return timeLastModified(this.filename) > this.last_parsed;
+        return timeLastModified(this.filename) > this.last_parsed && !this.needs_parse;
     }
     bool requires_rebuild() {
         return timeLastModified(this.filename) > this.last_built;
@@ -181,7 +182,7 @@ casds {};
         return exists(this.mod_file) && isFile(this.mod_file);
     }
 
-    void read_mod_file() {
+    void read_mod_file(Module[string] modules) {
         IniData data = read_ini(this.mod_file);
         if (get(data, "build", "last_built") != "") {
             auto ftime = SysTime.fromISOString(get(data, "build", "last_built"));
@@ -190,8 +191,32 @@ casds {};
         }
         if (get(data, "core", "last_parsed") != "") {
             auto ftime = SysTime.fromISOString(get(data, "core", "last_parsed"));
-            if (ftime > this.last_parsed)
+            if (ftime > this.last_parsed) {
                 this.last_parsed = ftime;
+                this.imports.length = 0;
+                if ("imports" in data) {
+                    auto import_names = data["imports"].keys;
+                    foreach(modname; import_names) {
+                        if (modname !in modules) {
+                            this.needs_parse = true;
+                            break;
+                        }
+                        this.add_imports(modules[modname]);
+                    }
+                }
+                this.imported.length = 0;
+                if ("imported" in data) {
+                    auto import_names = data["imported"].keys;
+                    foreach(modname; import_names) {
+                        if (modname !in modules) {
+                            debug writeln(this.package_name, " ", modname);
+                            this.needs_parse = true;
+                            break;
+                        }
+                        this.add_imported(modules[modname]);
+                    }
+                }
+            }
         }
     }
 
@@ -199,6 +224,10 @@ casds {};
         IniData data;
         data["build"]["last_built"] = this.last_built.toISOString();
         data["core"]["last_parsed"] = this.last_parsed.toISOString();
+        foreach(mod; this.imports)
+            data["imports"][mod.package_name] = mod.filename;
+        foreach(mod; this.imported)
+            data["imported"][mod.package_name] = mod.filename;
         write_ini(data, this.mod_file);
     }
 }
