@@ -7,7 +7,7 @@ import mod;
 import config;
 import ini;
 
-void main() {
+int main() {
     version(unittest) {
         return;
     }
@@ -36,16 +36,8 @@ void main() {
     } else
         src_dir = absolutePath(get(config, "core", "src_dir"), root_dir);
     debug writeln("Source: ", src_dir);
-    
-    auto df_iter = dirEntries(src_dir, SpanMode.depth);
-    Module[string] modules;
-    foreach(string fn; df_iter)
-        if (extension(fn) == ".d") {
-            auto mod = new Module(fn, src_dir, root_dir);
-            if (mod.has_mod_file())
-                mod.read_mod_file();
-            modules[mod.package_name] = mod;
-        }
+
+    auto modules = find_modules(src_dir, root_dir);
     debug writeln("Modules: ", modules);
 
     bool dirty = false;
@@ -55,13 +47,31 @@ void main() {
             mod.parse_imports(modules);
             dirty = true;
         }
+        scope(exit) mod.write_mod_file();
     }
     
     Module[string] roots = find_roots(modules);
+    foreach(root; roots.values) {
+        if (root.cycle_in_imports()) {
+            writeln("Cycle detected in dependencies");
+            return 1;
+        }
+    }
     debug writeln("Roots: ", roots);
+    return 0;
+}
 
-    foreach(mod; modules.values)
-        mod.write_mod_file();
+Module[string] find_modules(string src_dir, string root_dir) {
+    auto df_iter = dirEntries(src_dir, SpanMode.depth);
+    Module[string] modules;
+    foreach(string fn; df_iter)
+        if (extension(fn) == ".d") {
+            auto mod = new Module(fn, src_dir, root_dir);
+            if (mod.has_mod_file())
+                mod.read_mod_file();
+            modules[mod.package_name] = mod;
+        }
+    return modules;
 }
 
 string find_root_dir() {
