@@ -55,22 +55,31 @@ bool bin_exists(IniData data) {
 
 string binary_location(IniData config, Module mod) {
     string binname = mod.package_name;
+    string bt = config["internal"]["build_type"];
     
     // Special case #1
-    if ("targets" in config && binname in config["targets"])
-        binname = get(config, "targets", binname);
-    else if (binname == "main")
-        binname = get(config, "core", "name", binname);
-    else if (config["internal"]["build_type"] != "default")
-        binname ~= "." ~ config["internal"]["build_type"];
+    if (bt ~ "_targets" in config && binname in config[bt ~ "_targets"])
+        binname = get(config, bt ~ "_targets", binname);
+    else {
+        if (binname == "main")
+            binname = get(config, "core", "name", binname);
+        if (bt != "default")
+            binname ~= "." ~ config["internal"]["build_type"];
+    }
         
     auto pth = buildNormalizedPath(config["internal"]["root_dir"], "bin", binname);
     return pth;
 }
 
 string library_location(IniData config, Module mod) {
+    string bt = config["internal"]["build_type"];
+    auto libname = mod.package_name;
+    if (get(config, bt ~ "_targets", mod.package_name) != "")
+        libname = get(config, bt ~ "_targets", mod.package_name);
+    else if (bt != "default")
+        libname ~= "." ~ bt;
     return buildNormalizedPath(config["internal"]["root_dir"], "lib",
-                               get(config, "targets", mod.package_name, mod.package_name)) ~ ".a";
+                               libname ~ ".a");
 }
 
 void init_bin(IniData data) {
@@ -125,8 +134,9 @@ IniData get_config() {
     string root_dir = find_root_dir();
     bool root_found = root_dir != "";
 
-    if (!root_found)
+    if (!root_found) {
         root_dir = guess_root_dir();
+    }
     if (!dot_dabble_exists(root_dir)) {
         writeln("Creating new .dabble directory in ", root_dir);
         init_dot_dabble(root_dir);
