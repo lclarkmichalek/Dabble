@@ -32,3 +32,25 @@ IniData get_dabble_conf(string root) {
 void write_dabble_conf(IniData data, string root) {
     write_ini(data, buildPath(root, ".dabble.conf"));
 }
+
+bool bin_exists(string root) {
+    auto bin = buildPath(root, "bin");
+    return exists(bin) && isDir(bin);
+}
+
+void init_bin(string root) {
+    auto bin = buildPath(root, "bin");
+    mkdir(bin);
+}
+
+bool pkg_exists(string root) {
+    auto pkg = buildPath(root, "pkg");
+    return exists(pkg) && isDir(pkg);
+}
+
+void init_pkg(string root) {
+    auto pkg = buildPath(root, "pkg");
+    mkdir(pkg);
+    mkdir(buildPath(pkg, "int"));
+    mkdir(buildPath(pkg, "obj"));
+}

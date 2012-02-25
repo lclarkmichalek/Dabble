@@ -59,6 +59,21 @@ int main() {
         }
     }
     debug writeln("Roots: ", roots);
+
+    if (!bin_exists(root_dir)) {
+        writeln("Creating bin directory");
+        init_bin(root_dir);
+    }
+    if (!pkg_exists(root_dir)) {
+        writeln("Creating pkg directory");
+        init_pkg(root_dir);
+    }
+
+    Module[] standalone;
+    foreach(mod; modules.values) {
+        if (mod.imported.length == 0)
+            standalone ~= mod;
+    }
     
     return 0;
 }
