@@ -12,6 +12,10 @@ private {
     import ini;
 }
 
+enum MODULE_TYPE {
+    library, executable, module_
+}
+
 class Module {
 public:
     string package_name;
@@ -24,7 +28,7 @@ public:
     bool needs_parse = false;
     bool needs_rebuild = false;
 
-    bool is_root = false;
+    MODULE_TYPE type = MODULE_TYPE.module_;
     
     Module[] imported;
     Module[] imports;
@@ -156,11 +160,15 @@ public:
     private {
         string import_regex = r"^\s*import\s+([\w_]+\.)*[\w_]+(\s*:\s*([\w_]+\s*,\s*)*[\w_]+)?\s*;$";
         string package_regex = r"([\w_]+\.)*[\w_]+";
+        string main_func_regex = r"^\s*[\w_]+\s*main\(.*";
     }
     void parse_imports(Module[string] modules) {
         auto file = File(this.filename, "r");
         foreach(cline; file.byLine()) {
             string line = strip(cast(string)cline.dup);
+            if (match(line, this.main_func_regex)) {
+                this.type = MODULE_TYPE.executable;
+            }
             if (match(line, this.import_regex)) {
                 // Remove first 7 chars ("import ")
                 line = line[7..$];

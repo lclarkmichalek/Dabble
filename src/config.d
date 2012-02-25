@@ -55,6 +55,10 @@ string binary_location(IniData config, Module mod) {
     return buildPath(config["internal"]["root_dir"], "bin", binname);
 }
 
+string library_location(IniData config, Module mod) {
+    return buildPath(config["internal"]["root_dir"], "lib", mod.package_name);
+}
+
 void init_bin(IniData data) {
     auto bin = buildPath(data["internal"]["root_dir"], "bin");
     mkdir(bin);
@@ -69,6 +73,16 @@ void init_pkg(IniData data) {
     auto pkg = buildPath(data["internal"]["root_dir"], "pkg");
     mkdir(pkg);
     mkdir(buildPath(pkg, "obj"));
+}
+bool lib_exists(IniData data) {
+    auto lib = buildPath(data["internal"]["root_dir"], "lib");
+    return exists(lib) && isDir(lib);
+}
+
+void init_lib(IniData data) {
+    auto lib = buildPath(data["internal"]["root_dir"], "lib");
+    mkdir(lib);
+    mkdir(buildPath(lib, "obj"));
 }
 
 string object_dir(IniData data) {

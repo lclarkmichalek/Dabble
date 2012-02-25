@@ -25,22 +25,18 @@ int main() {
     
     Module[string] roots = find_roots(modules);
     foreach(root; roots.values) {
-        root.is_root = true;
+        if (root.type != MODULE_TYPE.executable)
+            root.type = MODULE_TYPE.library;
         if (root.cycle_in_imports()) {
             writeln("Cycle detected in dependencies");
             return 1;
         }
     }
-    debug writeln("Roots: ", roots);
 
     foreach(mod; modules.values) {
         if (mod.requires_rebuild()) {
             mod.propogate_rebuild();
         }
-    }
-    debug foreach(mod; modules.values) {
-        if (mod.requires_rebuild())
-            writeln(mod, " needs rebuild");
     }
 
     if (!bin_exists(config)) {
@@ -50,6 +46,10 @@ int main() {
     if (!pkg_exists(config)) {
         writeln("Creating pkg directory");
         init_pkg(config);
+    }
+    if (!lib_exists(config)) {
+        writeln("Creating lib directory");
+        init_lib(config);
     }
 
     Module[] buildables;
@@ -109,7 +109,7 @@ bool build(Module mod, IniData config) {
     if (compiled != 0)
         return false;
 
-    if (mod.is_root) {
+    if (mod.type != MODULE_TYPE.module_) {
         auto ok = link(mod, config);
         if (!ok)
             return false;
@@ -119,13 +119,19 @@ bool build(Module mod, IniData config) {
 }
 
 bool link(Module mod, IniData config) {
-    writeln("Linking ", mod.package_name);
+    writeln("Linking ", mod.package_name, " as a ", mod.type);
     string[] arglist = ["dmd"];
     arglist ~= get_user_link_flags(config);
     foreach(imported; unique(mod.all_imports()~mod)) {
         arglist ~= object_file(config, imported);
     }
-    arglist ~= "-of" ~ binary_location(config, mod);
+
+    if (mod.type == MODULE_TYPE.library) {
+        arglist ~= "-lib";
+        arglist ~= "-of" ~ library_location(config, mod);
+    } else {
+        arglist ~= "-of" ~ binary_location(config, mod);
+    }
     debug writeln(join(arglist, " "));
     int ok = system(join(arglist, " "));
     return ok == 0;
