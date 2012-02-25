@@ -51,7 +51,8 @@ public:
         this.last_modified = timeLastModified(this.filename);
         this.package_name = get_package_name(filename, get(config, "internal", "src_dir"));
         this.mod_file = buildNormalizedPath(get(config, "internal", "root_dir"),
-                                  ".dabble", "modules", package_name);
+                                            ".dabble", "modules",
+                                            package_name ~ "." ~ config["internal"]["build_type"]);
     }
 
     string toString() {

@@ -5,6 +5,7 @@ private {
     import std.stdio;
     import std.array : join;
     import std.process;
+    import std.string;
     
     import utils;
     import mod;
@@ -12,13 +13,18 @@ private {
     import ini;
 }
 
-int main() {
+int main(string[] args) {
     version(unittest) {
         return;
     }
-
+    
     IniData config = get_config();
     scope(exit) write_dabble_conf(config);
+    
+    if (args.length > 1)
+        config["internal"]["build_type"] = toLower(args[1]);
+    else
+        config["internal"]["build_type"] = "default";
     
     auto modules = load_modules(config);
     scope(exit) foreach(mod; modules.values) mod.write_mod_file();
@@ -93,7 +99,7 @@ int main() {
 }
 
 bool build(Module mod, IniData config) {
-    writeln("Building ", mod.package_name);
+    writeln("Building ", relativePath(mod.filename, getcwd()));
     string[] arglist = ["dmd", "-c"];
     arglist ~= get_user_compile_flags(config);
     arglist ~= mod.filename;
@@ -119,20 +125,26 @@ bool build(Module mod, IniData config) {
 }
 
 bool link(Module mod, IniData config) {
-    writeln("Linking ", mod.package_name, " as a ", mod.type);
+    write("Linking ", relativePath(mod.filename, getcwd()), " as a ", mod.type, "...");
     string[] arglist = ["dmd"];
     arglist ~= get_user_link_flags(config);
     foreach(imported; unique(mod.imports ~mod)) {
         arglist ~= object_file(config, imported);
     }
 
+    string out_location;
     if (mod.type == MODULE_TYPE.library) {
+        out_location = library_location(config, mod);
         arglist ~= "-lib";
-        arglist ~= "-of" ~ library_location(config, mod);
-    } else {
-        arglist ~= "-of" ~ binary_location(config, mod);
-    }
+    } else
+        out_location = binary_location(config, mod);
+    arglist ~= "-of" ~ out_location;
+    
     debug writeln(join(arglist, " "));
     int ok = system(join(arglist, " "));
+    if (ok == 0)
+        writeln("OK -> ", relativePath(out_location, getcwd())); 
+    else
+        writeln("Build failed");
     return ok == 0;
 }

@@ -26,6 +26,15 @@ bool dabble_conf_exists(string root) {
 void init_dabble_conf(string root) {
     IniData conf;
     conf["core"]["name"] = baseName(root);
+
+    conf["default"]["compile_flags"] = "-inline";
+    conf["default"]["link_flags"] = "-inline";
+    conf["release"]["compile_flags"] = "-inline -release -O";
+    conf["release"]["link_flags"] = "-inline -release -O";
+    conf["debug"]["compile_flags"] = "-debug -g";
+    conf["debug"]["link_flags"] = "-debug -g";
+    conf["unittest"]["compile_flags"] = "-unittest -g";
+    conf["unittest"]["link_flags"] = "-unittest -g";
     write_ini(conf, buildNormalizedPath(root, ".dabble.conf"));
 }
 
@@ -52,8 +61,11 @@ string binary_location(IniData config, Module mod) {
         binname = get(config, "targets", binname);
     else if (binname == "main")
         binname = get(config, "core", "name", binname);
+    else if (config["internal"]["build_type"] != "default")
+        binname ~= "." ~ config["internal"]["build_type"];
         
-    return buildNormalizedPath(config["internal"]["root_dir"], "bin", binname);
+    auto pth = buildNormalizedPath(config["internal"]["root_dir"], "bin", binname);
+    return pth;
 }
 
 string library_location(IniData config, Module mod) {
@@ -68,13 +80,16 @@ void init_bin(IniData data) {
 
 bool pkg_exists(IniData data) {
     auto pkg = buildNormalizedPath(data["internal"]["root_dir"], "pkg");
-    return exists(pkg) && isDir(pkg);
+    auto obj = buildNormalizedPath(pkg, data["internal"]["build_type"]);
+    return exists(pkg) && isDir(pkg) && exists(obj) && isDir(obj);
 }
 
 void init_pkg(IniData data) {
     auto pkg = buildNormalizedPath(data["internal"]["root_dir"], "pkg");
-    mkdir(pkg);
-    mkdir(buildNormalizedPath(pkg, "obj"));
+    try
+        mkdir(pkg);
+    catch (FileException)
+        mkdir(buildNormalizedPath(pkg, data["internal"]["build_type"]));
 }
 bool lib_exists(IniData data) {
     auto lib = buildNormalizedPath(data["internal"]["root_dir"], "lib");
@@ -84,26 +99,26 @@ bool lib_exists(IniData data) {
 void init_lib(IniData data) {
     auto lib = buildNormalizedPath(data["internal"]["root_dir"], "lib");
     mkdir(lib);
-    mkdir(buildNormalizedPath(lib, "obj"));
 }
 
 string object_dir(IniData data) {
-    return buildNormalizedPath(data["internal"]["root_dir"], "pkg", "obj");
+    return buildNormalizedPath(data["internal"]["root_dir"], "pkg",
+                               data["internal"]["build_type"]);
 }
 
 string object_file(IniData data, Module mod) {
     string split_pkg = buildNormalizedPath(join(split(mod.package_name, "."), "/"));
-    string path = buildNormalizedPath(data["internal"]["root_dir"],
-                            "pkg", "obj", split_pkg  ~ ".o");
+    string path = buildNormalizedPath(object_dir(data),
+                                      split_pkg ~ ".o");
     return path;
 }
 
 string get_user_compile_flags(IniData data) {
-    return get(data, "flags", "compile");
+    return get(data, data["internal"]["build_type"], "compile_flags");
 }
 
 string get_user_link_flags(IniData data) {
-    return get(data, "flags", "link");
+    return get(data, data["internal"]["build_type"], "link_flags");
 }
 
 IniData get_config() {
