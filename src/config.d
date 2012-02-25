@@ -136,6 +136,7 @@ IniData get_config() {
 
     if (!root_found) {
         root_dir = guess_root_dir();
+        root_dir = verify_root_dir(root_dir);
     }
     if (!dot_dabble_exists(root_dir)) {
         writeln("Creating new .dabble directory in ", root_dir);
@@ -209,6 +210,21 @@ string guess_root_dir() {
     return absolutePath(max_name);
 }
 
+string verify_root_dir(string root) {
+    write("No Dabble directories found, predicted project root at ",
+          relativePath(root, getcwd()), " Ok? [Y/n] ");
+    auto response = readln();
+    if (response[0..1] == "n") {
+        write("Please enter the project root: ");
+        root = strip(readln());
+        while (!isValidPath(root)) {
+            write("Invalid path, please try again: ");
+            root = strip(readln());
+        }
+    }
+    writeln("Project root at ", relativePath(root, getcwd()));
+    return absolutePath(root);
+}
 
 string find_src_dir(string root) {
     auto src = buildNormalizedPath(root, "src");

@@ -99,7 +99,7 @@ int main(string[] args) {
 }
 
 bool build(Module mod, IniData config) {
-    writeln("Building ", relativePath(mod.filename, getcwd()));
+    writeln("Compiling ", relativePath(mod.filename, getcwd()));
     string[] arglist = ["dmd", "-c"];
     arglist ~= get_user_compile_flags(config);
     arglist ~= mod.filename;
