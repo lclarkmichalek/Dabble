@@ -32,44 +32,42 @@ IniData get_dabble_conf(string root) {
     return read_ini(buildPath(root, ".dabble.conf"));
 }
 
-void write_dabble_conf(IniData data, string root) {
-    write_ini(data, buildPath(root, ".dabble.conf"));
+void write_dabble_conf(IniData data) {
+    auto pth = buildPath(get(data, "internal", "root_dir"), ".dabble.conf");
+    data.remove("internal");
+    write_ini(data, pth);
 }
 
-bool bin_exists(string root) {
-    auto bin = buildPath(root, "bin");
+bool bin_exists(IniData data) {
+    auto bin = buildPath(data["internal"]["root_dir"], "bin");
     return exists(bin) && isDir(bin);
 }
 
-string binary_location(string root, Module mod) {
-    return buildPath(root, "bin", mod.package_name);
+string binary_location(IniData data, Module mod) {
+    return buildPath(data["internal"]["root_dir"], "bin", mod.package_name);
 }
 
-void init_bin(string root) {
-    auto bin = buildPath(root, "bin");
+void init_bin(IniData data) {
+    auto bin = buildPath(data["internal"]["root_dir"], "bin");
     mkdir(bin);
 }
 
-bool pkg_exists(string root) {
-    auto pkg = buildPath(root, "pkg");
+bool pkg_exists(IniData data) {
+    auto pkg = buildPath(data["internal"]["root_dir"], "pkg");
     return exists(pkg) && isDir(pkg);
 }
 
-void init_pkg(string root) {
-    auto pkg = buildPath(root, "pkg");
+void init_pkg(IniData data) {
+    auto pkg = buildPath(data["internal"]["root_dir"], "pkg");
     mkdir(pkg);
-    mkdir(buildPath(pkg, "int"));
     mkdir(buildPath(pkg, "obj"));
 }
 
-string interface_file(string root, Module mod) {
-    return buildPath(root, "pkg", "int", mod.package_name ~ ".di");
+string object_dir(IniData data) {
+    return buildPath(data["internal"]["root_dir"], "pkg", "obj");
 }
 
-string object_dir(string root) {
-    return buildPath(root, "pkg", "obj");
-}
-
-string object_file(string root, Module mod) {
-    return buildPath(root, "pkg", "obj", mod.package_name ~ ".o");
+string object_file(IniData data, Module mod) {
+    return buildPath(data["internal"]["root_dir"],
+                     "pkg", "obj", mod.package_name ~ ".o");
 }

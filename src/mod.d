@@ -33,7 +33,7 @@ public:
 
     /* Takes the filename of the module (For identification purpouses only, the
        file will not be read from disk */
-    this(string filename, string src_path, string root_path) {
+    this(string filename, string src_path, string root_dir) {
         this.last_built = Clock.currTime();
         this.last_built.stdTime(0); // set to 0 if never built
         this.last_parsed = Clock.currTime();
@@ -42,7 +42,7 @@ public:
         this.filename = filename;
         this.last_modified = timeLastModified(this.filename);
         this.package_name = get_package_name(filename, src_path);
-        this.mod_file = buildPath(root_path, ".dabble", "modules", package_name);
+        this.mod_file = buildPath(root_dir, ".dabble", "modules", package_name);
     }
 
     string toString() {

@@ -31,24 +31,24 @@ int main() {
         }
     }
     IniData config = get_dabble_conf(root_dir);
-    scope(exit) write_dabble_conf(config, root_dir);
-    debug writeln("Project name: ", get(config, "core", "name"));
-
+    scope(exit) write_dabble_conf(config);
+    config["internal"]["root_dir"] = root_dir;
+    
     string src_dir;
     if (get(config, "core", "src_dir") == "") {
         src_dir = find_src_dir(root_dir);
         set(config, "core", "src_dir", relativePath(src_dir, root_dir));
     } else
         src_dir = absolutePath(get(config, "core", "src_dir"), root_dir);
-
-    auto modules = find_modules(src_dir, root_dir);
+    config["internal"]["src_dir"] = src_dir;
+    
+    auto modules = find_modules(config);
 
     bool dirty = false;
     foreach(name, mod; modules) {
         if (mod.has_mod_file())
             mod.read_mod_file(modules);
         if (mod.requires_reparse()) {
-            writeln(mod.package_name, " changed, parsing imports");
             mod.parse_imports(modules);
             dirty = true;
         }
@@ -75,13 +75,13 @@ int main() {
             writeln(mod, " needs rebuild");
     }
 
-    if (!bin_exists(root_dir)) {
+    if (!bin_exists(config)) {
         writeln("Creating bin directory");
-        init_bin(root_dir);
+        init_bin(config);
     }
-    if (!pkg_exists(root_dir)) {
+    if (!pkg_exists(config)) {
         writeln("Creating pkg directory");
-        init_pkg(root_dir);
+        init_pkg(config);
     }
 
     Module[] buildables;
@@ -99,7 +99,7 @@ int main() {
     for (int i=0; buildables.length != i; i++) {
         auto mod = buildables[i];
         if (mod.requires_rebuild()) {
-            bool built = build(mod, root_dir, modules);
+            bool built = build(mod, config);
             if (!built) {
                 writeln("Failed to build ", mod.package_name);
                 return 1;
@@ -124,24 +124,24 @@ int main() {
     return 0;
 }
 
-bool build(Module mod, string root_dir, Module[string] modules) {
+bool build(Module mod, IniData config) {
     writeln("Building ", mod.package_name);
     string[] arglist = ["dmd", "-inline", "-c"];
     arglist ~= mod.filename;
     foreach(imported; unique(mod.all_imports()))  {
         arglist ~= imported.filename;
-        arglist ~= object_file(root_dir, imported);
+        arglist ~= object_file(config, imported);
     }
     // Object file
-    arglist ~= "-od" ~ object_dir(root_dir);
+    arglist ~= "-od" ~ object_dir(config);
 
-    writeln(join(arglist, " "));
+    debug writeln(join(arglist, " "));
     int compiled = system(join(arglist, " "));
     if (compiled != 0)
         return false;
 
     if (mod.is_root) {
-        auto ok = link(mod, root_dir);
+        auto ok = link(mod, config);
         if (!ok)
             return false;
     }
@@ -149,24 +149,26 @@ bool build(Module mod, string root_dir, Module[string] modules) {
     return true;
 }
 
-bool link(Module mod, string root_dir) {
+bool link(Module mod, IniData config) {
     writeln("Linking ", mod.package_name);
     string[] arglist = ["dmd", "-inline"];
     foreach(imported; unique(mod.all_imports()~mod)) {
-        arglist ~= object_file(root_dir, imported);
+        arglist ~= object_file(config, imported);
     }
-    arglist ~= "-of" ~ binary_location(root_dir, mod);
-    writeln(join(arglist, " "));
+    arglist ~= "-of" ~ binary_location(config, mod);
+    debug writeln(join(arglist, " "));
     int ok = system(join(arglist, " "));
     return ok == 0;
 }
 
-Module[string] find_modules(string src_dir, string root_dir) {
-    auto df_iter = dirEntries(src_dir, SpanMode.depth);
+Module[string] find_modules(IniData config) {
+    auto df_iter = dirEntries(get(config, "internal", "src_dir"), SpanMode.depth);
     Module[string] modules;
     foreach(string fn; df_iter)
         if (extension(fn) == ".d") {
-            auto mod = new Module(fn, src_dir, root_dir);
+            auto mod = new Module(fn,
+                                  get(config, "internal", "src_dir"),
+                                  get(config, "internal", "root_dir"));
             modules[mod.package_name] = mod;
         }
     return modules;
