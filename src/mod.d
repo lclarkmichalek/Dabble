@@ -1,13 +1,16 @@
-import std.stdio;
-import std.file;
-import std.regex : match;
-import std.algorithm : equal;
-import std.array : split, join;
-import std.path;
-import std.datetime;
-
-import utils : filter;
-import ini;
+private {
+    import std.stdio;
+    import std.file;
+    import std.regex : match;
+    import std.algorithm : equal;
+    import std.array : split, join;
+    import std.path;
+    import std.datetime;
+    import std.string : strip;
+    
+    import utils;
+    import ini;
+}
 
 class Module {
 public:
@@ -17,7 +20,9 @@ public:
 
     SysTime last_built;
     SysTime last_parsed; // Last time we parsed imports from the file
+    SysTime last_modified;
     bool needs_parse = false;
+    bool needs_rebuild = false;
 
     bool is_root = false;
     
@@ -35,6 +40,7 @@ public:
         this.last_parsed.stdTime(0); // set to 0 if never parsed
         
         this.filename = filename;
+        this.last_modified = timeLastModified(this.filename);
         this.package_name = get_package_name(filename, src_path);
         this.mod_file = buildPath(root_path, ".dabble", "modules", package_name);
     }
@@ -120,11 +126,31 @@ public:
         return false;
     }
 
+    Module[] all_imports() {
+        auto all = this.imports.dup;
+        foreach(mod; this.imports) {
+            foreach(imp; mod.all_imports())
+                if (!inside(all, imp))
+                    all ~= imp;
+        }
+        return all;
+    }
+    
     bool requires_reparse() {
-        return timeLastModified(this.filename) > this.last_parsed && !this.needs_parse;
+        return this.last_modified > this.last_parsed || this.needs_parse;
     }
     bool requires_rebuild() {
-        return timeLastModified(this.filename) > this.last_built;
+        return this.last_modified > this.last_built || this.needs_rebuild;
+    }
+
+    // If this module requires rebuild, then so do all the modules it depends on
+    void propogate_rebuild() {
+        if (!requires_rebuild())
+            return;
+        foreach(mod; imported) {
+            mod.needs_rebuild = true;
+            mod.propogate_rebuild();
+        }
     }
     
     private {
@@ -134,7 +160,7 @@ public:
     void parse_imports(Module[string] modules) {
         auto file = File(this.filename, "r");
         foreach(cline; file.byLine()) {
-            string line = cast(string)cline.dup;
+            string line = strip(cast(string)cline.dup);
             if (match(line, this.import_regex)) {
                 // Remove first 7 chars ("import ")
                 line = line[7..$];

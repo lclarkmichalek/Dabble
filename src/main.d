@@ -1,11 +1,16 @@
-import std.path;
-import std.file;
-import std.stdio;
-
-import utils : filter;
-import mod;
-import config;
-import ini;
+private {
+    import std.datetime;
+    import std.path;
+    import std.file;
+    import std.stdio;
+    import std.array : join;
+    import std.process;
+    
+    import utils;
+    import mod;
+    import config;
+    import ini;
+}
 
 int main() {
     version(unittest) {
@@ -47,8 +52,8 @@ int main() {
             mod.parse_imports(modules);
             dirty = true;
         }
-        scope(exit) mod.write_mod_file();
     }
+    scope(exit) foreach(mod; modules.values) mod.write_mod_file();
     
     Module[string] roots = find_roots(modules);
     foreach(root; roots.values) {
@@ -60,6 +65,16 @@ int main() {
     }
     debug writeln("Roots: ", roots);
 
+    foreach(mod; modules.values) {
+        if (mod.requires_rebuild()) {
+            mod.propogate_rebuild();
+        }
+    }
+    debug foreach(mod; modules.values) {
+        if (mod.requires_rebuild())
+            writeln(mod, " needs rebuild");
+    }
+
     if (!bin_exists(root_dir)) {
         writeln("Creating bin directory");
         init_bin(root_dir);
@@ -69,13 +84,81 @@ int main() {
         init_pkg(root_dir);
     }
 
-    Module[] standalone;
+    Module[] buildables;
     foreach(mod; modules.values) {
-        if (mod.imported.length == 0)
-            standalone ~= mod;
+        bool all_imports_buildable = true;
+        foreach(imported; mod.imports) {
+            if (imported.requires_rebuild())
+                all_imports_buildable = false;
+        }
+        if (all_imports_buildable)
+            buildables ~= mod;
+    }
+
+    // Don't use foreach as buildables will be changing length
+    for (int i=0; buildables.length != i; i++) {
+        auto mod = buildables[i];
+        if (mod.requires_rebuild()) {
+            bool built = build(mod, root_dir, modules);
+            if (!built) {
+                writeln("Failed to build ", mod.package_name);
+                return 1;
+            }
+
+            foreach(mod_; modules.values) {
+                // Continue if they're allready buildable
+                if (inside(buildables, mod_))
+                    continue;
+                
+                // Add any modules that has all buildable dependencies
+                bool non_buildable_depend = false;
+                foreach(depend; mod_.imports)
+                    if (!inside(buildables, depend))
+                        non_buildable_depend = true;
+                if (!non_buildable_depend)
+                    buildables ~= mod_;
+            }
+        }
     }
     
     return 0;
+}
+
+bool build(Module mod, string root_dir, Module[string] modules) {
+    writeln("Building ", mod.package_name);
+    string[] arglist = ["dmd", "-inline", "-c"];
+    arglist ~= mod.filename;
+    foreach(imported; unique(mod.all_imports()))  {
+        arglist ~= imported.filename;
+        arglist ~= object_file(root_dir, imported);
+    }
+    // Object file
+    arglist ~= "-od" ~ object_dir(root_dir);
+
+    writeln(join(arglist, " "));
+    int compiled = system(join(arglist, " "));
+    if (compiled != 0)
+        return false;
+
+    if (mod.is_root) {
+        auto ok = link(mod, root_dir);
+        if (!ok)
+            return false;
+    }
+    mod.last_built = Clock.currTime();
+    return true;
+}
+
+bool link(Module mod, string root_dir) {
+    writeln("Linking ", mod.package_name);
+    string[] arglist = ["dmd", "-inline"];
+    foreach(imported; unique(mod.all_imports()~mod)) {
+        arglist ~= object_file(root_dir, imported);
+    }
+    arglist ~= "-of" ~ binary_location(root_dir, mod);
+    writeln(join(arglist, " "));
+    int ok = system(join(arglist, " "));
+    return ok == 0;
 }
 
 Module[string] find_modules(string src_dir, string root_dir) {

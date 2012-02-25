@@ -1,10 +1,11 @@
-import std.path;
-import std.file;
-import std.stdio;
-import std.regex;
-import std.array : split;
-import std.string : strip;
-
+private {
+    import std.path;
+    import std.file;
+    import std.stdio;
+    import std.regex;
+    import std.array : split;
+    import std.string : strip;
+}
 alias string[string][string] IniData;
 
 void write_ini(IniData data, string filename) {

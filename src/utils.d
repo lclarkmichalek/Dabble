@@ -11,4 +11,18 @@ B[] filter(alias f, A)(A[] input) if (is(typeof(f(input[0])) == B)) {
     foreach(a; input)
         output ~= f(a);
     return output;
+ }
+
+bool inside(A)(A[] input, A test) {
+    foreach(testable; input)
+        if (test == testable)
+            return true;
+    return false;
+}
+
+A[] unique(A)(A[] input) {
+    string[A] tmp;
+    foreach(a; input)
+        tmp[a] = "";
+    return tmp.keys;
 }
