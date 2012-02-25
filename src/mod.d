@@ -1,4 +1,5 @@
 private {
+    import std.conv;
     import std.stdio;
     import std.file;
     import std.regex;
@@ -224,12 +225,17 @@ public:
                 }
             }
         }
+        if (get(data, "core", "type") != "") {
+            this.type = to!MODULE_TYPE(get(data, "core", "type"));
+        } else
+            this.needs_parse = true;
     }
 
     void write_mod_file() {
         IniData data;
         data["build"]["last_built"] = this.last_built.toISOString();
         data["core"]["last_parsed"] = this.last_parsed.toISOString();
+        data["core"]["type"] = to!string(this.type);
         foreach(mod; this.imports)
             data["imports"][mod.package_name] = mod.filename;
         foreach(mod; this.imported)

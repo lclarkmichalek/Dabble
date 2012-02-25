@@ -102,7 +102,7 @@ bool build(Module mod, IniData config) {
         arglist ~= object_file(config, imported);
     }
     // Object file
-    arglist ~= "-od" ~ object_dir(config);
+    arglist ~= "-od" ~ dirName(object_file(config, mod));
 
     debug writeln(join(arglist, " "));
     int compiled = system(join(arglist, " "));

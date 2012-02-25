@@ -2,6 +2,7 @@ private {
     import std.path;
     import std.file;
     import std.stdio;
+    import std.array : split, join;
     
     import ini;
     import mod;
@@ -56,7 +57,7 @@ string binary_location(IniData config, Module mod) {
 }
 
 string library_location(IniData config, Module mod) {
-    return buildPath(config["internal"]["root_dir"], "lib", mod.package_name);
+    return buildPath(config["internal"]["root_dir"], "lib", mod.package_name) ~ ".a";
 }
 
 void init_bin(IniData data) {
@@ -90,8 +91,10 @@ string object_dir(IniData data) {
 }
 
 string object_file(IniData data, Module mod) {
-    return buildPath(data["internal"]["root_dir"],
-                     "pkg", "obj", mod.package_name ~ ".o");
+    string split_pkg = buildPath(join(split(mod.package_name, "."), "/"));
+    string path = buildPath(data["internal"]["root_dir"],
+                            "pkg", "obj", split_pkg  ~ ".o");
+    return path;
 }
 
 string get_user_compile_flags(IniData data) {
