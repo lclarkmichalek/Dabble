@@ -17,6 +17,8 @@ public:
 
     SysTime last_built;
     SysTime last_parsed; // Last time we parsed imports from the file
+
+    bool is_root = false;
     
     Module[] imported;
     Module[] imports;

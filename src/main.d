@@ -35,10 +35,8 @@ int main() {
         set(config, "core", "src_dir", relativePath(src_dir, root_dir));
     } else
         src_dir = absolutePath(get(config, "core", "src_dir"), root_dir);
-    debug writeln("Source: ", src_dir);
 
     auto modules = find_modules(src_dir, root_dir);
-    debug writeln("Modules: ", modules);
 
     bool dirty = false;
     foreach(name, mod; modules) {
@@ -52,12 +50,14 @@ int main() {
     
     Module[string] roots = find_roots(modules);
     foreach(root; roots.values) {
+        root.is_root = true;
         if (root.cycle_in_imports()) {
             writeln("Cycle detected in dependencies");
             return 1;
         }
     }
     debug writeln("Roots: ", roots);
+    
     return 0;
 }
 
