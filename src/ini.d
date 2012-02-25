@@ -20,7 +20,7 @@ void write_ini(IniData data, string filename) {
 
 private {
     string ini_header = r"^\[[\w _\d]+\]$";
-    string ini_value = r"^[\w_]+\s*=\s*[\w_/\\+-]+";
+    string ini_value = r"^[\w_.]+\s*=\s*[.\w_/\\+-]+";
 }
 
 IniData read_ini(string filename) {

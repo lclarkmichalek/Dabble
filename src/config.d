@@ -9,38 +9,38 @@ private {
 }
 
 bool dot_dabble_exists(string root) {
-    auto dabblef = buildPath(root, ".dabble");
+    auto dabblef = buildNormalizedPath(root, ".dabble");
     return exists(dabblef) && isDir(dabblef);
 }
 
 void init_dot_dabble(string root) {
-    string dabblef = buildPath(root, ".dabble");
+    string dabblef = buildNormalizedPath(root, ".dabble");
     mkdir(dabblef);
-    mkdir(buildPath(dabblef, "modules"));
+    mkdir(buildNormalizedPath(dabblef, "modules"));
 }
 
 bool dabble_conf_exists(string root) {
-    auto dabblef = buildPath(root, ".dabble.conf");
+    auto dabblef = buildNormalizedPath(root, ".dabble.conf");
     return exists(dabblef) && isFile(dabblef);
 }
 void init_dabble_conf(string root) {
     IniData conf;
     conf["core"]["name"] = baseName(root);
-    write_ini(conf, buildPath(root, ".dabble.conf"));
+    write_ini(conf, buildNormalizedPath(root, ".dabble.conf"));
 }
 
 IniData get_dabble_conf(string root) {
-    return read_ini(buildPath(root, ".dabble.conf"));
+    return read_ini(buildNormalizedPath(root, ".dabble.conf"));
 }
 
 void write_dabble_conf(IniData data) {
-    auto pth = buildPath(get(data, "internal", "root_dir"), ".dabble.conf");
+    auto pth = buildNormalizedPath(get(data, "internal", "root_dir"), ".dabble.conf");
     data.remove("internal");
     write_ini(data, pth);
 }
 
 bool bin_exists(IniData data) {
-    auto bin = buildPath(data["internal"]["root_dir"], "bin");
+    auto bin = buildNormalizedPath(data["internal"]["root_dir"], "bin");
     return exists(bin) && isDir(bin);
 }
 
@@ -53,46 +53,46 @@ string binary_location(IniData config, Module mod) {
     else if (binname == "main")
         binname = get(config, "core", "name", binname);
         
-    return buildPath(config["internal"]["root_dir"], "bin", binname);
+    return buildNormalizedPath(config["internal"]["root_dir"], "bin", binname);
 }
 
 string library_location(IniData config, Module mod) {
-    return buildPath(config["internal"]["root_dir"], "lib", mod.package_name) ~ ".a";
+    return buildNormalizedPath(config["internal"]["root_dir"], "lib", mod.package_name) ~ ".a";
 }
 
 void init_bin(IniData data) {
-    auto bin = buildPath(data["internal"]["root_dir"], "bin");
+    auto bin = buildNormalizedPath(data["internal"]["root_dir"], "bin");
     mkdir(bin);
 }
 
 bool pkg_exists(IniData data) {
-    auto pkg = buildPath(data["internal"]["root_dir"], "pkg");
+    auto pkg = buildNormalizedPath(data["internal"]["root_dir"], "pkg");
     return exists(pkg) && isDir(pkg);
 }
 
 void init_pkg(IniData data) {
-    auto pkg = buildPath(data["internal"]["root_dir"], "pkg");
+    auto pkg = buildNormalizedPath(data["internal"]["root_dir"], "pkg");
     mkdir(pkg);
-    mkdir(buildPath(pkg, "obj"));
+    mkdir(buildNormalizedPath(pkg, "obj"));
 }
 bool lib_exists(IniData data) {
-    auto lib = buildPath(data["internal"]["root_dir"], "lib");
+    auto lib = buildNormalizedPath(data["internal"]["root_dir"], "lib");
     return exists(lib) && isDir(lib);
 }
 
 void init_lib(IniData data) {
-    auto lib = buildPath(data["internal"]["root_dir"], "lib");
+    auto lib = buildNormalizedPath(data["internal"]["root_dir"], "lib");
     mkdir(lib);
-    mkdir(buildPath(lib, "obj"));
+    mkdir(buildNormalizedPath(lib, "obj"));
 }
 
 string object_dir(IniData data) {
-    return buildPath(data["internal"]["root_dir"], "pkg", "obj");
+    return buildNormalizedPath(data["internal"]["root_dir"], "pkg", "obj");
 }
 
 string object_file(IniData data, Module mod) {
-    string split_pkg = buildPath(join(split(mod.package_name, "."), "/"));
-    string path = buildPath(data["internal"]["root_dir"],
+    string split_pkg = buildNormalizedPath(join(split(mod.package_name, "."), "/"));
+    string path = buildNormalizedPath(data["internal"]["root_dir"],
                             "pkg", "obj", split_pkg  ~ ".o");
     return path;
 }
@@ -127,7 +127,7 @@ IniData get_config() {
         src_dir = find_src_dir(root_dir);
         set(config, "core", "src_dir", relativePath(src_dir, root_dir));
     } else
-        src_dir = absolutePath(get(config, "core", "src_dir"), root_dir);
+        src_dir = buildNormalizedPath(absolutePath(get(config, "core", "src_dir"), root_dir));
     config["internal"]["src_dir"] = src_dir;
     return config;
 }
@@ -136,10 +136,10 @@ string find_root_dir() {
     string find_root_prime(string checking) {
         if (checking == "/")
             return "";
-        if (exists(buildPath(checking, ".dabble")) &&
-            isDir(buildPath(checking, ".dabble")) ||
-            exists(buildPath(checking, ".dabble.conf")) &&
-            isFile(buildPath(checking, ".dabble.conf")))
+        if (exists(buildNormalizedPath(checking, ".dabble")) &&
+            isDir(buildNormalizedPath(checking, ".dabble")) ||
+            exists(buildNormalizedPath(checking, ".dabble.conf")) &&
+            isFile(buildNormalizedPath(checking, ".dabble.conf")))
             return checking;
         else
             return find_root_prime(buildNormalizedPath(checking, ".."));
@@ -154,12 +154,12 @@ string guess_root_dir() {
 
         int score = 0;
         // check for src dir
-        string src_path = buildPath(checking, "src");
+        string src_path = buildNormalizedPath(checking, "src");
         if (exists(src_path) && isDir(src_path))
             score += 10;
         else {
             // Check for project dir (common to have src in there) 
-            src_path = buildPath(checking, baseName(checking));
+            src_path = buildNormalizedPath(checking, baseName(checking));
             if (exists(src_path) && isDir(src_path))
                 score += 5;
             src_path = checking;
@@ -185,7 +185,7 @@ string guess_root_dir() {
 
 
 string find_src_dir(string root) {
-    auto src = buildPath(root, "src");
+    auto src = buildNormalizedPath(root, "src");
     if (exists(src) && isDir(src))
         return src;
     else
