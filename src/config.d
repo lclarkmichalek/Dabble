@@ -57,7 +57,8 @@ string binary_location(IniData config, Module mod) {
 }
 
 string library_location(IniData config, Module mod) {
-    return buildNormalizedPath(config["internal"]["root_dir"], "lib", mod.package_name) ~ ".a";
+    return buildNormalizedPath(config["internal"]["root_dir"], "lib",
+                               get(config, "targets", mod.package_name, mod.package_name)) ~ ".a";
 }
 
 void init_bin(IniData data) {
