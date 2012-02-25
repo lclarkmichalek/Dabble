@@ -20,17 +20,7 @@ int main() {
     IniData config = get_config();
     scope(exit) write_dabble_conf(config);
     
-    auto modules = find_modules(config);
-
-    bool dirty = false;
-    foreach(name, mod; modules) {
-        if (mod.has_mod_file())
-            mod.read_mod_file(modules);
-        if (mod.requires_reparse()) {
-            mod.parse_imports(modules);
-            dirty = true;
-        }
-    }
+    auto modules = load_modules(config);
     scope(exit) foreach(mod; modules.values) mod.write_mod_file();
     
     Module[string] roots = find_roots(modules);

@@ -258,13 +258,37 @@ casds {};
     }
 }
 
-Module[string] find_roots(Module[string] mods) {
+Module[string] pure find_roots(Module[string] mods) {
     Module[string] roots;
     foreach(name, mod; mods) {
         if (mod.imported.length == 0)
             roots[name] = mod;
     }
     return roots;
+}
+
+Module[string] find_modules(IniData config) {
+    auto df_iter = dirEntries(get(config, "internal", "src_dir"), SpanMode.depth);
+    Module[string] modules;
+    foreach(string fn; df_iter)
+        if (extension(fn) == ".d") {
+            auto mod = new Module(fn,
+                                  get(config, "internal", "src_dir"),
+                                  get(config, "internal", "root_dir"));
+            modules[mod.package_name] = mod;
+        }
+    return modules;
+}
+
+Module[string] load_modules(IniData config) {
+    auto mods = find_modules(config);
+    foreach(name, mod; mods) {
+        if (mod.has_mod_file())
+            mod.read_mod_file(mods);
+        if (mod.requires_reparse())
+            mod.parse_imports(mods);
+    }
+    return mods
 }
 
 string get_package_name(string file, string root_dir) {
