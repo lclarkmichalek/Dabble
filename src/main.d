@@ -197,11 +197,17 @@ string guess_root_dir() {
             return grades;
 
         int score = 0;
+        // check for src dir
         string src_path = buildPath(checking, "src");
         if (exists(src_path) && isDir(src_path))
             score += 10;
-        else
+        else {
+            // Check for project dir (common to have src in there) 
+            src_path = buildPath(checking, baseName(checking));
+            if (exists(src_path) && isDir(src_path))
+                score += 5;
             src_path = checking;
+        }
         auto src_files = dirEntries(src_path, SpanMode.shallow);
         foreach(string filename; src_files) {
             if (extension(filename) == ".d")
