@@ -130,16 +130,3 @@ bool link(Module mod, IniData config) {
     int ok = system(join(arglist, " "));
     return ok == 0;
 }
-
-Module[string] find_modules(IniData config) {
-    auto df_iter = dirEntries(get(config, "internal", "src_dir"), SpanMode.depth);
-    Module[string] modules;
-    foreach(string fn; df_iter)
-        if (extension(fn) == ".d") {
-            auto mod = new Module(fn,
-                                  get(config, "internal", "src_dir"),
-                                  get(config, "internal", "root_dir"));
-            modules[mod.package_name] = mod;
-        }
-    return modules;
-}

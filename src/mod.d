@@ -258,7 +258,7 @@ casds {};
     }
 }
 
-Module[string] pure find_roots(Module[string] mods) {
+pure Module[string] find_roots(Module[string] mods) {
     Module[string] roots;
     foreach(name, mod; mods) {
         if (mod.imported.length == 0)
@@ -288,7 +288,7 @@ Module[string] load_modules(IniData config) {
         if (mod.requires_reparse())
             mod.parse_imports(mods);
     }
-    return mods
+    return mods;
 }
 
 string get_package_name(string file, string root_dir) {
