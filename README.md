@@ -76,4 +76,12 @@ build type:
     [release_targets]
     foo=foo_bar
 
-Entries for non-root modules are ignored.
+Glob syntax is also supported. The following will link all the modules
+in the `foo.bar` package into a single binary named `foobar`:
+
+    # .dabble.conf
+    [release_targets]
+    foo.bar.*=foobar
+
+If targets are specified, then Dabble root detection will not be used
+to find targets.
