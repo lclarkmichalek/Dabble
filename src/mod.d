@@ -31,7 +31,7 @@ public:
     SysTime last_modified;
     bool needs_parse = false;
     bool needs_rebuild = false;
-    bool can_build = true;
+    bool errored = false;
 
     MODULE_TYPE type = MODULE_TYPE.module_;
     
@@ -143,7 +143,7 @@ public:
     }
     bool requires_rebuild() {
         return (this.last_modified > this.last_built || this.needs_rebuild) &&
-            this.can_build;
+            !this.errored;
     }
 
     // If this module requires rebuild, then so do all the modules it depends on
@@ -172,7 +172,7 @@ public:
         try
             output = shell(cmdline);
         catch (ErrnoException) {
-            this.can_build = false;
+            this.errored = true;
             writeln("Failed to parse ", relativePath(this.filename, getcwd()));
             return;
         }

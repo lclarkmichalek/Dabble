@@ -11,6 +11,7 @@ private {
     import mod;
     import config;
     import ini;
+    import target;
 }
 
 int main(string[] args) {
@@ -44,6 +45,9 @@ int main(string[] args) {
             mod.propogate_rebuild();
         }
     }
+    
+    Target[] targets = get_targets(config, modules);
+    targets = need_rebuild(targets);
 
     if (!bin_exists(config)) {
         writeln("Creating bin directory");
@@ -75,7 +79,7 @@ int main(string[] args) {
         if (mod.requires_rebuild()) {
             bool built = build(mod, config);
             if (!built) {
-                mod.can_build = false;
+                mod.errored = true;
                 continue;
             }
 
@@ -95,9 +99,13 @@ int main(string[] args) {
         }
     }
 
+    foreach(targ; targets) {
+        bool ok = targ.link();
+    }
+    
     string[] couldnt_build;
     foreach(mod; modules.values) {
-        if (!mod.can_build) {
+        if (mod.errored) {
             couldnt_build ~= relativePath(mod.filename, getcwd());
         }
     }
@@ -126,36 +134,6 @@ bool build(Module mod, IniData config) {
     if (compiled != 0)
         return false;
 
-    if (mod.type != MODULE_TYPE.module_) {
-        auto ok = link(mod, config);
-        if (!ok)
-            return false;
-    }
     mod.last_built = Clock.currTime();
     return true;
-}
-
-bool link(Module mod, IniData config) {
-    write("Linking ", relativePath(mod.filename, getcwd()), " as a ", mod.type, "...");
-    string[] arglist = ["dmd"];
-    arglist ~= get_user_link_flags(config);
-    foreach(imported; unique(mod.imports ~mod)) {
-        arglist ~= object_file(config, imported);
-    }
-
-    string out_location;
-    if (mod.type == MODULE_TYPE.library) {
-        out_location = library_location(config, mod);
-        arglist ~= "-lib";
-    } else
-        out_location = binary_location(config, mod);
-    arglist ~= "-of" ~ out_location;
-    
-    debug writeln(join(arglist, " "));
-    int ok = system(join(arglist, " "));
-    if (ok == 0)
-        writeln("OK -> ", relativePath(out_location, getcwd())); 
-    else
-        writeln("Build failed");
-    return ok == 0;
 }
