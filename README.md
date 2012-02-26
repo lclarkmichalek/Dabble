@@ -22,6 +22,9 @@ If dabble gets anything wrong, or the build fails when it shouldn't have, delete
 the `.dabble` directory, as it does not contain any information that cannot be
 regerated by dabble.
 
+Dabble can build itself without configuration, and can build libraries
+such as Derelict3 and Tango-D2 with minimal configuration.
+
 ## `root_path`
 
 The first time that dabble is run, it will try and detect the root directory of
