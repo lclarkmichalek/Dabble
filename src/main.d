@@ -12,6 +12,7 @@ private {
     import config;
     import ini;
     import target;
+    import color;
 }
 
 int main(string[] args) {
@@ -26,7 +27,7 @@ int main(string[] args) {
         config["internal"]["build_type"] = toLower(args[1]);
     else
         config["internal"]["build_type"] = "default";
-    
+
     auto modules = load_modules(config);
     scope(exit) foreach(mod; modules.values) mod.write_mod_file();
     
@@ -35,7 +36,7 @@ int main(string[] args) {
         if (root.type != MODULE_TYPE.executable)
             root.type = MODULE_TYPE.library;
         if (root.cycle_in_imports()) {
-            writeln("Cycle detected in dependencies");
+            writeln(scolor("Cycle detected in dependencies", COLORS.red));
             return 1;
         }
     }
@@ -111,14 +112,14 @@ int main(string[] args) {
     }
 
     if (couldnt_build.length != 0) {
-        writeln("Couldn't build " ~ join(couldnt_build, ", "));
+        writeln(scolor("Couldn't build " ~ join(couldnt_build, ", "), COLORS.red));
     }
     
     return 0;
 }
 
 bool build(Module mod, IniData config) {
-    writeln("Compiling ", relativePath(mod.filename, getcwd()));
+    write("Compiling ", relativePath(mod.filename, getcwd()), "...");
     string[] arglist = ["dmd", "-c"];
     arglist ~= get_user_compile_flags(config);
     arglist ~= mod.filename;
@@ -131,8 +132,11 @@ bool build(Module mod, IniData config) {
 
     debug writeln(join(arglist, " "));
     int compiled = system(join(arglist, " "));
-    if (compiled != 0)
+    if (compiled != 0) {
+        writeln(scolor("Build failed", COLORS.red));
         return false;
+    }
+    writeln(scolor("OK", COLORS.green));
 
     mod.last_built = Clock.currTime();
     return true;

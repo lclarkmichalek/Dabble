@@ -5,7 +5,7 @@ private {
     import std.stdio;
     import std.file;
     
-    import ini, mod, config;
+    import ini, mod, config, color;
 }
 
 class Target {
@@ -48,9 +48,9 @@ class Target {
         debug writeln(dmd_link_cmdline());
         int ok = system(dmd_link_cmdline());
         if (ok == 0)
-            writeln("Ok");
+            writeln(scolor("Ok", COLORS.green));
         else
-            writeln("Build failed");
+            writeln(scolor("Build failed", COLORS.red));
         return ok == 0;
     }
 

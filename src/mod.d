@@ -13,6 +13,7 @@ private {
     
     import utils;
     import ini;
+    import color;
 }
 
 enum MODULE_TYPE {
@@ -166,6 +167,7 @@ public:
             }*/
     }
     void parse_imports(Module[string] modules) {
+        write("Parsing ", relativePath(this.filename, getcwd()), "...");
         string cmdline = "dmd -v -c -of/dev/null "~this.filename~" -I" ~
             get(config, "internal", "src_dir") ~ " 2>/dev/null";
         string output;
@@ -173,9 +175,10 @@ public:
             output = shell(cmdline);
         catch (ErrnoException) {
             this.errored = true;
-            writeln("Failed to parse ", relativePath(this.filename, getcwd()));
+            writeln(scolor("Parse failed", COLORS.red));
             return;
         }
+        writeln(scolor("OK", COLORS.green));
         foreach(line; splitLines(output)) {
             line = strip(line);
             if (match(line, this.main_func_regex)) {
