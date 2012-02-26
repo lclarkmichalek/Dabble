@@ -78,12 +78,11 @@ Target[] get_targets(IniData config, Module[string] modules) {
                     targ_mods ~= mod;
                 }
 
-            string dir;
+            string output;
             if (main is null)
-                dir = "lib";
+                output = buildPath(config["internal"]["root_dir"], "lib", target ~ ".a");
             else
-                dir = "bin";
-            string output = buildPath(config["internal"]["root_dir"], dir, target ~ ".a");
+                output = buildPath(config["internal"]["root_dir"], "bin", target);
             Target targ;
             targ = new Target(config, targ_mods, output);
             if (main is null)
