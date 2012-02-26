@@ -75,8 +75,8 @@ int main(string[] args) {
         if (mod.requires_rebuild()) {
             bool built = build(mod, config);
             if (!built) {
-                writeln("Failed to build ", mod.package_name);
-                return 1;
+                mod.can_build = false;
+                continue;
             }
 
             foreach(mod_; modules.values) {
