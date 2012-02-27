@@ -66,7 +66,10 @@ public:
     }
 
     bool compile() {
-        write("Compiling ", this.toString(), "...");
+        if (getbool(config, "ui", "verbose")) {
+            write("Compiling ", this.toString(), "...");
+            stdout.flush();
+        }
 
         // Change to src dir to get the -op flag actually working
         auto pwd = getcwd();
@@ -95,11 +98,17 @@ public:
         int compiled = system(join(arglist, " "));
         chdir(pwd);
         if (compiled != 0) {
-            writeln(scolor("Build failed", COLORS.red));
+            if (getbool(config, "ui", "verbose"))
+                writelnc("Build failed", COLORS.red);
+            else
+                writec("F", COLORS.red);
             this.errored = true;
             return false;
         } else {
-            writeln(scolor("OK", COLORS.green));
+            if (getbool(config, "ui", "verbose"))
+                writelnc("OK", COLORS.green);
+            else
+                writec(".", COLORS.green);
             auto time = Clock.currTime();
             foreach(imp; this.imports ~ this)
                 imp.last_built = time;
@@ -134,7 +143,8 @@ public:
             }*/
     }
     void parse(Module[string] modules) {
-        write("Parsing ", relativePath(this.filename, getcwd()), "...");
+        if (getbool(config, "ui", "verbose"))
+            write("Parsing ", relativePath(this.filename, getcwd()), "...");
         string cmdline = "dmd -v -c -of/dev/null "~this.filename~" -I" ~
             get(config, "internal", "src_dir") ~ " 2>/dev/null";
         string output;
@@ -142,10 +152,16 @@ public:
             output = shell(cmdline);
         catch (ErrnoException) {
             this.errored = true;
-            writeln(scolor("Parse failed", COLORS.red));
+            if (getbool(config, "ui", "verbose"))
+                writelnc("Parse failed", COLORS.red);
+            else
+                writec("F", COLORS.red);
             return;
         }
-        writeln(scolor("OK", COLORS.green));
+        if (getbool(config, "ui", "verbose"))
+            writelnc("OK", COLORS.green);
+        else
+            writec(".", COLORS.green);
         foreach(line; splitLines(output)) {
             line = strip(line);
             if (match(line, this.main_func_regex)) {

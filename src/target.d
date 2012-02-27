@@ -44,13 +44,23 @@ class Target {
     }
 
     bool link() {
-        write("Linking ", relativePath(output, getcwd()), "...");
+        if (getbool(config, "ui", "verbose")) {
+            write("Linking ", relativePath(output, getcwd()), "...");
+            stdout.flush();
+        }
         debug writeln(dmd_link_cmdline());
         int ok = system(dmd_link_cmdline());
-        if (ok == 0)
-            writeln(scolor("Ok", COLORS.green));
-        else
-            writeln(scolor("Build failed", COLORS.red));
+        if (ok == 0) {
+            if (getbool(config, "ui", "verbose"))
+                writelnc("Ok", COLORS.green);
+            else
+                writec(".", COLORS.green);
+        } else {
+            if (getbool(config, "ui", "verbose"))
+                writelnc("Build failed", COLORS.red);
+            else
+                writec("F", COLORS.red);
+        }
         return ok == 0;
     }
 

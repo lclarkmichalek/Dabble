@@ -27,21 +27,20 @@ int main(string[] args) {
     else
         config["internal"]["build_type"] = "default";
 
-    auto modules = load_modules(config);
-    scope(exit) foreach(mod; modules.values) mod.write_mod_file();
-
     if (!bin_exists(config)) {
-        writeln("Creating bin directory");
         init_bin(config);
     }
     if (!pkg_exists(config)) {
-        writeln("Creating pkg directory");
         init_pkg(config);
     }
     if (!lib_exists(config)) {
-        writeln("Creating lib directory");
         init_lib(config);
     }
+
+    writeln("Parsing modules");
+    auto modules = load_modules(config);
+    scope(exit) foreach(mod; modules.values) mod.write_mod_file();
+    writeln("\nDone");
     
     Module[string] roots = find_roots(modules);
     foreach(root; roots.values) {
@@ -55,25 +54,39 @@ int main(string[] args) {
         }
     }
 
+    bool compiled;
+    writeln("\nCompiling modules");
     // Compile all the roots to generate the .o files of all the modules
     foreach(mod; find_roots(modules)) {
         if (!mod.requires_rebuild())
             continue;
         
+        compiled = true;
         bool built = mod.compile();
         if (!built) {
             mod.errored = true;
             continue;
         }
     }
+    if (!getbool(config, "ui", "verbose")) {
+        if (compiled) // i.e. did anything get printed
+            writeln("\nDone");
+        else
+            writeln("Up to date");
+    }
 
+    writeln("\nLinking targets");
     Target[] targets = get_targets(config, modules);
     targets = need_rebuild(targets);
     
     foreach(targ; targets) {
         bool ok = targ.link();
     }
-    
+    if (targets.length != 0)
+        writeln("\nDone");
+    else
+        writeln("Up to date\n");
+
     string[] couldnt_build;
     foreach(mod; modules.values) {
         if (mod.errored) {
@@ -84,6 +97,6 @@ int main(string[] args) {
     if (couldnt_build.length != 0) {
         writeln(scolor("Couldn't build " ~ join(couldnt_build, ", "), COLORS.red));
     }
-    
+
     return 0;
 }

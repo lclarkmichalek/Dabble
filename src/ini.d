@@ -49,6 +49,12 @@ string get(IniData data, string sec, string name, string def="") {
     return data[sec][name];
 }
 
+bool getbool(IniData data, string sec, string name, bool def=false) {
+    if (sec !in data || name !in data[sec])
+        return def;
+    return data[sec][name] == "yes";
+}
+
 void set(ref IniData data, string sec, string name, string val) {
     data[sec][name] = val;
 }
