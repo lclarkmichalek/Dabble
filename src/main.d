@@ -21,7 +21,6 @@ int main(string[] args) {
     }
     
     IniData config = get_config();
-    scope(exit) write_dabble_conf(config);
     
     if (args.length > 1)
         config["internal"]["build_type"] = toLower(args[1]);
