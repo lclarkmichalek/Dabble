@@ -54,6 +54,11 @@ int main(string[] args) {
         }
     }
 
+    // This needs to be before the stuff is rebuild, else we cannot determin which modules
+    // have been rebuilt
+    Target[] targets = get_targets(config, modules);
+    targets = need_rebuild(targets);
+
     bool compiled;
     writeln("\nCompiling modules");
     // Compile all the roots to generate the .o files of all the modules
@@ -76,8 +81,6 @@ int main(string[] args) {
     }
 
     writeln("\nLinking targets");
-    Target[] targets = get_targets(config, modules);
-    targets = need_rebuild(targets);
     
     foreach(targ; targets) {
         bool ok = targ.link();
