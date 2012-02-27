@@ -65,43 +65,44 @@ public:
         return this.rel_path;
     }
 
-    // Returns true if there is a cycle in the imports. Must be called on root
-    // module
-    bool cycle_in_imports() {
-        foreach(imports; this.imports)
-            foreach(imported; this.imported)
-                if (imports == imported)
-                    return true;
-        return false;
-    }
-
     bool compile() {
         write("Compiling ", this.toString(), "...");
+
+        // Change to src dir to get the -op flag actually working
+        auto pwd = getcwd();
+        chdir(config["internal"]["src_dir"]);
+        
         string[] arglist = ["dmd", "-c"];
         arglist ~= get_user_compile_flags(config);
-        
-        arglist ~= this.filename;
-        foreach(imports; this.imports) {
+
+        // All passed filenames need to be relative because -op is a bloody sham
+        arglist ~= relativePath(this.filename, getcwd());
+        foreach(imports; unique(this.imports)) {
             bool cycle = false;
-            arglist ~= imports.filename;
+            arglist ~= relativePath(imports.filename, getcwd());
 
             // May not have been generated yet
             string obj = object_file(config, imports);
-            if (exists(obj))
-                arglist ~= obj;
+            if (!exists(dirName(obj)))
+                mkdirRecurse(dirName(obj));
         }
 
-        arglist ~= "-od" ~ dirName(object_file(config, this));
+        arglist ~= "-od" ~ buildPath(config["internal"]["root_dir"], "pkg",
+                                     config["internal"]["build_type"]);
+        arglist ~= "-op";
 
         debug writeln(join(arglist, " "));
         int compiled = system(join(arglist, " "));
+        chdir(pwd);
         if (compiled != 0) {
             writeln(scolor("Build failed", COLORS.red));
             this.errored = true;
             return false;
         } else {
             writeln(scolor("OK", COLORS.green));
-            this.last_built = Clock.currTime();
+            auto time = Clock.currTime();
+            foreach(imp; this.imports ~ this)
+                imp.last_built = time;
             return true;
         }
     }
@@ -123,7 +124,6 @@ public:
         }
     }
     
-    
     private {
         //        version(Debug) {
         string import_regex = r"^import    (\w+\.)*\w+";
@@ -133,7 +133,7 @@ public:
             enum main_func_regex = ctRegex!r"^function\s+D main\s*$";
             }*/
     }
-    void parse_imports(Module[string] modules) {
+    void parse(Module[string] modules) {
         write("Parsing ", relativePath(this.filename, getcwd()), "...");
         string cmdline = "dmd -v -c -of/dev/null "~this.filename~" -I" ~
             get(config, "internal", "src_dir") ~ " 2>/dev/null";
@@ -257,7 +257,7 @@ Module[string] load_modules(IniData config) {
         if (mod.has_mod_file())
             mod.read_mod_file(mods);
         if (mod.requires_reparse())
-            mod.parse_imports(mods);
+            mod.parse(mods);
     }
     return mods;
 }

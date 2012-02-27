@@ -29,21 +29,6 @@ int main(string[] args) {
 
     auto modules = load_modules(config);
     scope(exit) foreach(mod; modules.values) mod.write_mod_file();
-    
-    Module[string] roots = find_roots(modules);
-    foreach(root; roots.values) {
-        if (root.type != MODULE_TYPE.executable)
-            root.type = MODULE_TYPE.library;
-    }
-
-    foreach(mod; modules.values) {
-        if (mod.requires_rebuild()) {
-            mod.propogate_rebuild();
-        }
-    }
-    
-    Target[] targets = get_targets(config, modules);
-    targets = need_rebuild(targets);
 
     if (!bin_exists(config)) {
         writeln("Creating bin directory");
@@ -57,44 +42,34 @@ int main(string[] args) {
         writeln("Creating lib directory");
         init_lib(config);
     }
+    
+    Module[string] roots = find_roots(modules);
+    foreach(root; roots.values) {
+        if (root.type != MODULE_TYPE.executable)
+            root.type = MODULE_TYPE.library;
+    }
 
-    Module[] buildables;
     foreach(mod; modules.values) {
-        bool all_imports_buildable = true;
-        foreach(imported; mod.imports) {
-            if (imported.requires_rebuild())
-                all_imports_buildable = false;
-        }
-        if (all_imports_buildable)
-            buildables ~= mod;
-    }
-
-    // Don't use foreach as buildables will be changing length
-    for (int i=0; buildables.length != i; i++) {
-        auto mod = buildables[i];
         if (mod.requires_rebuild()) {
-            bool built = mod.compile();
-            if (!built) {
-                mod.errored = true;
-                continue;
-            }
-
-            foreach(mod_; modules.values) {
-                // Continue if they're allready buildable
-                if (inside(buildables, mod_))
-                    continue;
-                
-                // Add any modules that has all buildable dependencies
-                bool non_buildable_depend = false;
-                foreach(depend; mod_.imports)
-                    if (!inside(buildables, depend))
-                        non_buildable_depend = true;
-                if (!non_buildable_depend)
-                    buildables ~= mod_;
-            }
+            mod.propogate_rebuild();
         }
     }
 
+    // Compile all the roots to generate the .o files of all the modules
+    foreach(mod; find_roots(modules)) {
+        if (!mod.requires_rebuild())
+            continue;
+        
+        bool built = mod.compile();
+        if (!built) {
+            mod.errored = true;
+            continue;
+        }
+    }
+
+    Target[] targets = get_targets(config, modules);
+    targets = need_rebuild(targets);
+    
     foreach(targ; targets) {
         bool ok = targ.link();
     }
