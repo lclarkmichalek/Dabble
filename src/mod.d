@@ -8,12 +8,13 @@ private {
     import std.path;
     import std.datetime;
     import std.string : strip, splitLines;
-    import std.process : shell;
+    import std.process : shell, system;
     import std.exception : ErrnoException;
     
     import utils;
     import ini;
     import color;
+    import config;
 }
 
 enum MODULE_TYPE {
@@ -24,6 +25,7 @@ class Module {
 public:
     string package_name;
     string filename;
+    string rel_path;
     string mod_file;
     IniData config;
 
@@ -51,6 +53,7 @@ public:
         this.last_parsed.stdTime(0); // set to 0 if never parsed
         
         this.filename = filename;
+        this.rel_path = relativePath(this.filename, getcwd());
         this.last_modified = timeLastModified(this.filename);
         this.package_name = get_package_name(filename, get(config, "internal", "src_dir"));
         this.mod_file = buildNormalizedPath(get(config, "internal", "root_dir"),
@@ -59,84 +62,48 @@ public:
     }
 
     string toString() {
-        return this.package_name;
+        return this.rel_path;
     }
 
     // Returns true if there is a cycle in the imports. Must be called on root
     // module
-    bool cycle_in_imports() in {
-        assert(this.imported.length == 0,
-               "Module.cycle_in_imports was not called on root object");
-    } body {
-        bool cycleprime(Module current, Module[] checked) {
-            checked ~= current;
-            foreach(imported; current.imports) {
-                foreach(chkd; checked) {
-                    if (imported is chkd)
-                        return true;
-                }
-                if (cycleprime(imported, checked))
+    bool cycle_in_imports() {
+        foreach(imports; this.imports)
+            foreach(imported; this.imported)
+                if (imports == imported)
                     return true;
-            }
+        return false;
+    }
+
+    bool compile() {
+        write("Compiling ", this.toString(), "...");
+        string[] arglist = ["dmd", "-c"];
+        arglist ~= get_user_compile_flags(config);
+        
+        arglist ~= this.filename;
+        foreach(imports; this.imports) {
+            bool cycle = false;
+            arglist ~= imports.filename;
+
+            // May not have been generated yet
+            string obj = object_file(config, imports);
+            if (exists(obj))
+                arglist ~= obj;
+        }
+
+        arglist ~= "-od" ~ dirName(object_file(config, this));
+
+        debug writeln(join(arglist, " "));
+        int compiled = system(join(arglist, " "));
+        if (compiled != 0) {
+            writeln(scolor("Build failed", COLORS.red));
+            this.errored = true;
             return false;
+        } else {
+            writeln(scolor("OK", COLORS.green));
+            this.last_built = Clock.currTime();
+            return true;
         }
-        return cycleprime(this, this.imported);
-    }
-    unittest {
-        auto m1 = new Module("/tmp/test.d", "/");
-        auto m2 = new Module("/tmp/test2.d", "/");
-        m1.add_imports(m2);
-        auto m3 = new Module("/tmp/test3.d", "/");
-        m2.add_imports(m3);
-        assert(!m1.cycle_in_imports(), "Module.cycle_in_imports failed #1");
-        m3.add_imports(m2);
-        assert(m1.cycle_in_imports(), "Module.cycle_in_imports failed #2");
-    }
-    
-    /* Adds the module to the imports and then adds this to the modules
-       imported, if not allready there. */
-    void add_imports(Module mod) {
-        this.imports ~= mod;
-        if (!mod.has_imported(this)) {
-            mod.add_imported(this);
-        }
-    }
-
-    /* Complementary function to add_imports */
-    void add_imported(Module mod) {
-        this.imported ~= mod;
-        if (!mod.has_imports(this)) {
-            mod.add_imports(this);
-        }
-    }
-
-    /* Adds the string to the external imports array */
-    void add_external_imports(string modname) {
-        this.external_imports ~= modname;
-    }
-
-    /* Returns true if mod in imports list */
-    bool has_imports(Module mod) {
-        foreach (other; this.imports)
-            if (mod == other)
-                return true;
-        return false;
-    }
-
-    /* Returns true if mod in imported list */
-    bool has_imported(Module mod) {
-        foreach (other; this.imported)
-            if (mod == other)
-                return true;
-        return false;
-    }
-
-    /* Adds the string to the external imports array */
-    bool has_external_imports(string modname) {
-        foreach (other; this.external_imports)
-            if (modname == other)
-                return true;
-        return false;
     }
 
     bool requires_reparse() {
@@ -189,10 +156,12 @@ public:
                 // Remove first 7 chars ("import ")
                 line = m.hit()[7..$];
                 string pkg_name = strip(line);
-                if (pkg_name in modules)
-                    this.add_imports(modules[pkg_name]);
-                else {
-                    this.add_external_imports(pkg_name);
+                if (pkg_name in modules) {
+                    auto mod = modules[pkg_name];
+                    this.imports ~= mod;
+                    mod.imported ~= this;
+                } else {
+                    this.external_imports ~= pkg_name;
                 }
             }
         }
@@ -222,7 +191,9 @@ public:
                             this.needs_parse = true;
                             break;
                         }
-                        this.add_imports(modules[modname]);
+                        auto mod = modules[modname];
+                        this.imports ~= mod;
+                        mod.imported ~= this;
                     }
                 }
                 this.imported.length = 0;
@@ -234,7 +205,9 @@ public:
                             this.needs_parse = true;
                             break;
                         }
-                        this.add_imported(modules[modname]);
+                        auto mod = modules[modname];
+                        this.imported ~= mod;
+                        mod.imports ~= this;
                     }
                 }
             }

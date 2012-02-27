@@ -34,10 +34,6 @@ int main(string[] args) {
     foreach(root; roots.values) {
         if (root.type != MODULE_TYPE.executable)
             root.type = MODULE_TYPE.library;
-        if (root.cycle_in_imports()) {
-            writeln(scolor("Cycle detected in dependencies", COLORS.red));
-            return 1;
-        }
     }
 
     foreach(mod; modules.values) {
@@ -77,7 +73,7 @@ int main(string[] args) {
     for (int i=0; buildables.length != i; i++) {
         auto mod = buildables[i];
         if (mod.requires_rebuild()) {
-            bool built = build(mod, config);
+            bool built = mod.compile();
             if (!built) {
                 mod.errored = true;
                 continue;
@@ -115,28 +111,4 @@ int main(string[] args) {
     }
     
     return 0;
-}
-
-bool build(Module mod, IniData config) {
-    write("Compiling ", relativePath(mod.filename, getcwd()), "...");
-    string[] arglist = ["dmd", "-c"];
-    arglist ~= get_user_compile_flags(config);
-    arglist ~= mod.filename;
-    foreach(imported; unique(mod.imports))  {
-        arglist ~= imported.filename;
-        arglist ~= object_file(config, imported);
-    }
-    // Object file
-    arglist ~= "-od" ~ dirName(object_file(config, mod));
-
-    debug writeln(join(arglist, " "));
-    int compiled = system(join(arglist, " "));
-    if (compiled != 0) {
-        writeln(scolor("Build failed", COLORS.red));
-        return false;
-    }
-    writeln(scolor("OK", COLORS.green));
-
-    mod.last_built = Clock.currTime();
-    return true;
 }
