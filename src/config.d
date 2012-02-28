@@ -3,12 +3,14 @@ private {
     import std.file;
     import std.stdio;
     import std.array : split, join;
+    import std.datetime;
     
     import ini;
     import mod;
 }
 
 IniData conf;
+SysTime conf_written;
 
 bool dot_dabble_exists(string root) {
     auto dabblef = buildNormalizedPath(root, ".dabble");
@@ -147,6 +149,7 @@ void load_config() {
         init_dabble_conf(root_dir);
     }
     conf = get_dabble_conf(root_dir);
+    conf_written = timeLastModified(buildPath(root_dir, ".dabble.conf"));
     conf["internal"]["root_dir"] = root_dir;
     
     string src_dir;

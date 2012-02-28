@@ -64,11 +64,12 @@ public:
     }
 
     bool requires_reparse() {
-        return this.last_modified > this.last_parsed || this.needs_parse;
+        return this.last_modified > this.last_parsed || this.needs_parse ||
+            conf_written > this.last_parsed;
     }
     bool requires_rebuild() {
         return (this.last_modified > this.last_built || this.needs_rebuild) &&
-            !this.errored;
+            !this.errored || conf_written > this.last_built;
     }
 
     // If this module requires rebuild, then so do all the modules it depends on
