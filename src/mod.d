@@ -65,57 +65,6 @@ public:
         return this.rel_path;
     }
 
-    bool compile() {
-        if (getbool(config, "ui", "verbose")) {
-            write("Compiling ", this.toString(), "...");
-            stdout.flush();
-        }
-
-        // Change to src dir to get the -op flag actually working
-        auto pwd = getcwd();
-        chdir(config["internal"]["src_dir"]);
-        
-        string[] arglist = ["dmd", "-c"];
-        arglist ~= get_user_compile_flags(config);
-
-        // All passed filenames need to be relative because -op is a bloody sham
-        arglist ~= relativePath(this.filename, getcwd());
-        foreach(imports; unique(this.imports)) {
-            bool cycle = false;
-            arglist ~= relativePath(imports.filename, getcwd());
-
-            // May not have been generated yet
-            string obj = object_file(config, imports);
-            if (!exists(dirName(obj)))
-                mkdirRecurse(dirName(obj));
-        }
-
-        arglist ~= "-od" ~ buildPath(config["internal"]["root_dir"], "pkg",
-                                     config["internal"]["build_type"]);
-        arglist ~= "-op";
-
-        debug writeln(join(arglist, " "));
-        int compiled = system(join(arglist, " "));
-        chdir(pwd);
-        if (compiled != 0) {
-            if (getbool(config, "ui", "verbose"))
-                writelnc("Build failed", COLORS.red);
-            else
-                writec("F", COLORS.red);
-            this.errored = true;
-            return false;
-        } else {
-            if (getbool(config, "ui", "verbose"))
-                writelnc("OK", COLORS.green);
-            else
-                writec(".", COLORS.green);
-            auto time = Clock.currTime();
-            foreach(imp; this.imports ~ this)
-                imp.last_built = time;
-            return true;
-        }
-    }
-
     bool requires_reparse() {
         return this.last_modified > this.last_parsed || this.needs_parse;
     }
@@ -142,11 +91,11 @@ public:
             enum main_func_regex = ctRegex!r"^function\s+D main\s*$";
             }*/
     }
-    void parse(Module[string] modules) {
+    bool parse(Module[string] modules) {
         if (getbool(config, "ui", "verbose"))
             write("Parsing ", relativePath(this.filename, getcwd()), "...");
         string cmdline = "dmd -v -c -of/dev/null "~this.filename~" -I" ~
-            get(config, "internal", "src_dir") ~ " 2>/dev/null";
+            get(config, "internal", "src_dir");
         string output;
         try
             output = shell(cmdline);
@@ -154,14 +103,10 @@ public:
             this.errored = true;
             if (getbool(config, "ui", "verbose"))
                 writelnc("Parse failed", COLORS.red);
-            else
-                writec("F", COLORS.red);
-            return;
+            return false;
         }
         if (getbool(config, "ui", "verbose"))
             writelnc("OK", COLORS.green);
-        else
-            writec(".", COLORS.green);
         foreach(line; splitLines(output)) {
             line = strip(line);
             if (match(line, this.main_func_regex)) {
@@ -182,6 +127,7 @@ public:
             }
         }
         this.last_parsed = Clock.currTime();
+        return true;
     }
 
     bool has_mod_file() {

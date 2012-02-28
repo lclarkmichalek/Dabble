@@ -53,13 +53,9 @@ class Target {
         if (ok == 0) {
             if (getbool(config, "ui", "verbose"))
                 writelnc("Ok", COLORS.green);
-            else
-                writec(".", COLORS.green);
         } else {
             if (getbool(config, "ui", "verbose"))
                 writelnc("Build failed", COLORS.red);
-            else
-                writec("F", COLORS.red);
         }
         return ok == 0;
     }

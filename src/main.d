@@ -37,10 +37,29 @@ int main(string[] args) {
         init_lib(config);
     }
 
-    writeln("Parsing modules");
-    auto modules = load_modules(config);
+    auto modules = find_modules(config);
+    Module[] reparsing;
+    foreach(name, mod; modules) {
+        if (mod.has_mod_file())
+            mod.read_mod_file(modules);
+        if (mod.requires_reparse())
+            reparsing ~= mod;
+    }
+    if (reparsing.length != 0) {
+        writeln("Parsing ", reparsing.length, " modules");
+        bool fail = false;
+        foreach(mod; reparsing)
+            if(!mod.parse(modules)) {
+                fail = true;
+                break;
+            }
+        if (fail) {
+            writelnc("Parsing failed", COLORS.red);
+            return 1;
+        } else
+            writelnc("Done", COLORS.green);
+    }
     scope(exit) foreach(mod; modules.values) mod.write_mod_file();
-    writeln("\nDone");
     
     Module[string] roots = find_roots(modules);
     foreach(root; roots.values) {
@@ -48,9 +67,10 @@ int main(string[] args) {
             root.type = MODULE_TYPE.library;
     }
 
+    Module[] recompiling;
     foreach(mod; modules.values) {
         if (mod.requires_rebuild()) {
-            mod.propogate_rebuild();
+            recompiling ~= mod ~ mod.imports;
         }
     }
 
@@ -59,47 +79,63 @@ int main(string[] args) {
     Target[] targets = get_targets(config, modules);
     targets = need_rebuild(targets);
 
-    bool compiled;
-    writeln("\nCompiling modules");
-    // Compile all the roots to generate the .o files of all the modules
-    foreach(mod; find_roots(modules)) {
-        if (!mod.requires_rebuild())
-            continue;
-        
-        compiled = true;
-        bool built = mod.compile();
+    if (recompiling.length != 0) {
+        bool compiled;
+        writeln("Compiling ", recompiling.length, " modules");
+        bool built = compile(recompiling, config);
         if (!built) {
-            mod.errored = true;
-            continue;
-        }
-    }
-    if (!getbool(config, "ui", "verbose")) {
-        if (compiled) // i.e. did anything get printed
-            writeln("\nDone");
-        else
-            writeln("Up to date");
-    }
-
-    writeln("\nLinking targets");
-    
-    foreach(targ; targets) {
-        bool ok = targ.link();
-    }
-    if (targets.length != 0)
-        writeln("\nDone");
-    else
-        writeln("Up to date\n");
-
-    string[] couldnt_build;
-    foreach(mod; modules.values) {
-        if (mod.errored) {
-            couldnt_build ~= relativePath(mod.filename, getcwd());
+            writelnc("Compile failed", COLORS.red);
+            return 1;
+        } else {
+            writelnc("Done", COLORS.green);
         }
     }
 
-    if (couldnt_build.length != 0) {
-        writeln(scolor("Couldn't build " ~ join(couldnt_build, ", "), COLORS.red));
+    if (targets.length != 0) {
+        writeln("Linking ", targets.length, " targets");
+        foreach(targ; targets) {
+            if(!targ.link()) {
+                writelnc("Link failed", COLORS.red);
+                return 1;
+            }
+        }
+        writelnc("Done", COLORS.green);
     }
 
     return 0;
+}
+
+bool compile(Module[] mods, IniData config) {
+    auto pwd = getcwd();
+    chdir(config["internal"]["src_dir"]);
+
+    string[] arglist = ["dmd", "-c"];
+    arglist ~= get_user_compile_flags(config);
+
+    // All passed filenames need to be relative because -op is a bloody sham
+    foreach(mod; unique(mods)) {
+        bool cycle = false;
+        arglist ~= relativePath(mod.filename, getcwd());
+        
+        // May not have been generated yet
+        string obj = object_file(config, mod);
+        if (!exists(dirName(obj)))
+            mkdirRecurse(dirName(obj));
+    }
+
+    arglist ~= "-od" ~ buildPath(config["internal"]["root_dir"], "pkg",
+                                 config["internal"]["build_type"]);
+    arglist ~= "-op";
+    
+    debug writeln(join(arglist, " "));
+    int compiled = system(join(arglist, " "));
+    chdir(pwd);
+    if (compiled == 0) {
+        auto time = Clock.currTime();
+        foreach(mod; mods)
+            mod.last_built = time;
+        return true;
+    } else {
+        return false;
+    }
 }
