@@ -8,6 +8,8 @@ private {
     import mod;
 }
 
+IniData conf;
+
 bool dot_dabble_exists(string root) {
     auto dabblef = buildNormalizedPath(root, ".dabble");
     return exists(dabblef) && isDir(dabblef);
@@ -42,95 +44,95 @@ IniData get_dabble_conf(string root) {
     return read_ini(buildNormalizedPath(root, ".dabble.conf"));
 }
 
-void write_dabble_conf(IniData data) {
-    auto pth = buildNormalizedPath(get(data, "internal", "root_dir"), ".dabble.conf");
-    data.remove("internal");
-    write_ini(data, pth);
+void write_dabble_conf() {
+    auto pth = buildNormalizedPath(get(conf, "internal", "root_dir"), ".dabble.conf");
+    conf.remove("internal");
+    write_ini(conf, pth);
 }
 
-bool bin_exists(IniData data) {
-    auto bin = buildNormalizedPath(data["internal"]["root_dir"], "bin");
+bool bin_exists() {
+    auto bin = buildNormalizedPath(conf["internal"]["root_dir"], "bin");
     return exists(bin) && isDir(bin);
 }
 
-string binary_location(IniData config, Module mod) {
+string binary_location(Module mod) {
     string binname = mod.package_name;
-    string bt = config["internal"]["build_type"];
+    string bt = conf["internal"]["build_type"];
     
     // Special case #1
-    if (bt ~ "_targets" in config && binname in config[bt ~ "_targets"])
-        binname = get(config, bt ~ "_targets", binname);
+    if (bt ~ "_targets" in conf && binname in conf[bt ~ "_targets"])
+        binname = get(conf, bt ~ "_targets", binname);
     else {
         if (binname == "main")
-            binname = get(config, "core", "name", binname);
+            binname = get(conf, "core", "name", binname);
         if (bt != "default")
-            binname ~= "." ~ config["internal"]["build_type"];
+            binname ~= "." ~ conf["internal"]["build_type"];
     }
         
-    auto pth = buildNormalizedPath(config["internal"]["root_dir"], "bin", binname);
+    auto pth = buildNormalizedPath(conf["internal"]["root_dir"], "bin", binname);
     return pth;
 }
 
-string library_location(IniData config, Module mod) {
-    string bt = config["internal"]["build_type"];
+string library_location(Module mod) {
+    string bt = conf["internal"]["build_type"];
     auto libname = mod.package_name;
-    if (get(config, bt ~ "_targets", mod.package_name) != "")
-        libname = get(config, bt ~ "_targets", mod.package_name);
+    if (get(conf, bt ~ "_targets", mod.package_name) != "")
+        libname = get(conf, bt ~ "_targets", mod.package_name);
     else if (bt != "default")
         libname ~= "." ~ bt;
-    return buildNormalizedPath(config["internal"]["root_dir"], "lib",
+    return buildNormalizedPath(conf["internal"]["root_dir"], "lib",
                                libname ~ ".a");
 }
 
-void init_bin(IniData data) {
-    auto bin = buildNormalizedPath(data["internal"]["root_dir"], "bin");
+void init_bin() {
+    auto bin = buildNormalizedPath(conf["internal"]["root_dir"], "bin");
     mkdir(bin);
 }
 
-bool pkg_exists(IniData data) {
-    auto pkg = buildNormalizedPath(data["internal"]["root_dir"], "pkg");
-    auto obj = buildNormalizedPath(pkg, data["internal"]["build_type"]);
+bool pkg_exists() {
+    auto pkg = buildNormalizedPath(conf["internal"]["root_dir"], "pkg");
+    auto obj = buildNormalizedPath(pkg, conf["internal"]["build_type"]);
     return exists(pkg) && isDir(pkg) && exists(obj) && isDir(obj);
 }
 
-void init_pkg(IniData data) {
-    auto pkg = buildNormalizedPath(data["internal"]["root_dir"], "pkg");
+void init_pkg() {
+    auto pkg = buildNormalizedPath(conf["internal"]["root_dir"], "pkg");
     try
         mkdir(pkg);
     catch (FileException)
-        mkdir(buildNormalizedPath(pkg, data["internal"]["build_type"]));
+        mkdir(buildNormalizedPath(pkg, conf["internal"]["build_type"]));
 }
-bool lib_exists(IniData data) {
-    auto lib = buildNormalizedPath(data["internal"]["root_dir"], "lib");
+bool lib_exists() {
+    auto lib = buildNormalizedPath(conf["internal"]["root_dir"], "lib");
     return exists(lib) && isDir(lib);
 }
 
-void init_lib(IniData data) {
-    auto lib = buildNormalizedPath(data["internal"]["root_dir"], "lib");
+void init_lib() {
+    auto lib = buildNormalizedPath(conf["internal"]["root_dir"], "lib");
     mkdir(lib);
 }
 
-string object_dir(IniData data) {
-    return buildNormalizedPath(data["internal"]["root_dir"], "pkg",
-                               data["internal"]["build_type"]);
+string object_dir() {
+    return buildNormalizedPath(conf["internal"]["root_dir"], "pkg",
+                               conf["internal"]["build_type"]);
 }
 
-string object_file(IniData data, Module mod) {
+string object_file(Module mod) {
     string split_pkg = buildNormalizedPath(join(split(mod.package_name, "."), "/"));
-    string path = buildNormalizedPath(object_dir(data),
+    string path = buildNormalizedPath(object_dir(),
                                       split_pkg ~ ".o");
     return path;
 }
 
-string get_user_compile_flags(IniData data) {
-    return get(data, data["internal"]["build_type"], "compile_flags");
+string get_user_compile_flags() {
+    return get(conf, conf["internal"]["build_type"], "compile_flags");
 }
 
-string get_user_link_flags(IniData data) {
-    return get(data, data["internal"]["build_type"], "link_flags");
+string get_user_link_flags() {
+    return get(conf, conf["internal"]["build_type"], "link_flags");
 }
 
-IniData get_config() {
+void load_config() {
     string root_dir = find_root_dir();
     bool root_found = root_dir != "";
 
@@ -144,17 +146,17 @@ IniData get_config() {
     if (!dabble_conf_exists(root_dir)) {
         init_dabble_conf(root_dir);
     }
-    IniData config = get_dabble_conf(root_dir);
-    config["internal"]["root_dir"] = root_dir;
+    conf = get_dabble_conf(root_dir);
+    conf["internal"]["root_dir"] = root_dir;
     
     string src_dir;
-    if (get(config, "core", "src_dir") == "") {
+    if (get(conf, "core", "src_dir") == "") {
         src_dir = find_src_dir(root_dir);
-        set(config, "core", "src_dir", relativePath(src_dir, root_dir));
+        set(conf, "core", "src_dir", relativePath(src_dir, root_dir));
+        write_dabble_conf();
     } else
-        src_dir = buildNormalizedPath(absolutePath(get(config, "core", "src_dir"), root_dir));
-    config["internal"]["src_dir"] = src_dir;
-    return config;
+        src_dir = buildNormalizedPath(absolutePath(get(conf, "core", "src_dir"), root_dir));
+    conf["internal"]["src_dir"] = src_dir;
 }
 
 string find_root_dir() {

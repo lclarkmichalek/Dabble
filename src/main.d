@@ -20,24 +20,24 @@ int main(string[] args) {
         return;
     }
     
-    IniData config = get_config();
+    load_config();
     
     if (args.length > 1)
-        config["internal"]["build_type"] = toLower(args[1]);
+        conf["internal"]["build_type"] = toLower(args[1]);
     else
-        config["internal"]["build_type"] = "default";
+        conf["internal"]["build_type"] = "default";
 
-    if (!bin_exists(config)) {
-        init_bin(config);
+    if (!bin_exists()) {
+        init_bin();
     }
-    if (!pkg_exists(config)) {
-        init_pkg(config);
+    if (!pkg_exists()) {
+        init_pkg();
     }
-    if (!lib_exists(config)) {
-        init_lib(config);
+    if (!lib_exists()) {
+        init_lib();
     }
 
-    auto modules = find_modules(config);
+    auto modules = find_modules();
     Module[] reparsing;
     foreach(name, mod; modules) {
         if (mod.has_mod_file())
@@ -70,19 +70,23 @@ int main(string[] args) {
     Module[] recompiling;
     foreach(mod; modules.values) {
         if (mod.requires_rebuild()) {
-            recompiling ~= mod ~ mod.imports;
+            recompiling ~= mod;
+            foreach(imp; mod.imports)
+                // Imps with requires_rebuild will be added later
+                if (!imp.requires_rebuild())
+                    recompiling ~= imp;
         }
     }
 
     // This needs to be before the stuff is rebuild, else we cannot determin which modules
     // have been rebuilt
-    Target[] targets = get_targets(config, modules);
+    Target[] targets = get_targets(modules);
     targets = need_rebuild(targets);
 
     if (recompiling.length != 0) {
         bool compiled;
         writeln("Compiling ", recompiling.length, " modules");
-        bool built = compile(recompiling, config);
+        bool built = compile(recompiling);
         if (!built) {
             writelnc("Compile failed", COLORS.red);
             return 1;
@@ -105,12 +109,12 @@ int main(string[] args) {
     return 0;
 }
 
-bool compile(Module[] mods, IniData config) {
+bool compile(Module[] mods) {
     auto pwd = getcwd();
-    chdir(config["internal"]["src_dir"]);
+    chdir(conf["internal"]["src_dir"]);
 
     string[] arglist = ["dmd", "-c"];
-    arglist ~= get_user_compile_flags(config);
+    arglist ~= get_user_compile_flags();
 
     // All passed filenames need to be relative because -op is a bloody sham
     foreach(mod; unique(mods)) {
@@ -118,13 +122,13 @@ bool compile(Module[] mods, IniData config) {
         arglist ~= relativePath(mod.filename, getcwd());
         
         // May not have been generated yet
-        string obj = object_file(config, mod);
+        string obj = object_file(mod);
         if (!exists(dirName(obj)))
             mkdirRecurse(dirName(obj));
     }
 
-    arglist ~= "-od" ~ buildPath(config["internal"]["root_dir"], "pkg",
-                                 config["internal"]["build_type"]);
+    arglist ~= "-od" ~ buildPath(conf["internal"]["root_dir"], "pkg",
+                                 conf["internal"]["build_type"]);
     arglist ~= "-op";
     
     debug writeln(join(arglist, " "));

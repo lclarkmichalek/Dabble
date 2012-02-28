@@ -27,7 +27,6 @@ public:
     string filename;
     string rel_path;
     string mod_file;
-    IniData config;
 
     SysTime last_built;
     SysTime last_parsed; // Last time we parsed imports from the file
@@ -45,8 +44,7 @@ public:
 
     /* Takes the filename of the module (For identification purpouses only, the
        file will not be read from disk */
-    this(string filename, IniData config) {
-        this.config = config;
+    this(string filename) {
         this.last_built = Clock.currTime();
         this.last_built.stdTime(0); // set to 0 if never built
         this.last_parsed = Clock.currTime();
@@ -55,10 +53,10 @@ public:
         this.filename = filename;
         this.rel_path = relativePath(this.filename, getcwd());
         this.last_modified = timeLastModified(this.filename);
-        this.package_name = get_package_name(filename, get(config, "internal", "src_dir"));
-        this.mod_file = buildNormalizedPath(get(config, "internal", "root_dir"),
+        this.package_name = get_package_name(filename, get(conf, "internal", "src_dir"));
+        this.mod_file = buildNormalizedPath(get(conf, "internal", "root_dir"),
                                             ".dabble", "modules",
-                                            package_name ~ "." ~ config["internal"]["build_type"]);
+                                            package_name ~ "." ~ conf["internal"]["build_type"]);
     }
 
     string toString() {
@@ -92,20 +90,20 @@ public:
             }*/
     }
     bool parse(Module[string] modules) {
-        if (getbool(config, "ui", "verbose"))
+        if (getbool(conf, "ui", "verbose"))
             write("Parsing ", relativePath(this.filename, getcwd()), "...");
         string cmdline = "dmd -v -c -of/dev/null "~this.filename~" -I" ~
-            get(config, "internal", "src_dir");
+            get(conf, "internal", "src_dir");
         string output;
         try
             output = shell(cmdline);
         catch (ErrnoException) {
             this.errored = true;
-            if (getbool(config, "ui", "verbose"))
+            if (getbool(conf, "ui", "verbose"))
                 writelnc("Parse failed", COLORS.red);
             return false;
         }
-        if (getbool(config, "ui", "verbose"))
+        if (getbool(conf, "ui", "verbose"))
             writelnc("OK", COLORS.green);
         foreach(line; splitLines(output)) {
             line = strip(line);
@@ -202,19 +200,19 @@ pure Module[string] find_roots(Module[string] mods) {
     return roots;
 }
 
-Module[string] find_modules(IniData config) {
-    auto df_iter = dirEntries(get(config, "internal", "src_dir"), SpanMode.depth);
+Module[string] find_modules() {
+    auto df_iter = dirEntries(get(conf, "internal", "src_dir"), SpanMode.depth);
     Module[string] modules;
     foreach(string fn; df_iter)
         if (extension(fn) == ".d") {
-            auto mod = new Module(fn, config);
+            auto mod = new Module(fn);
             modules[mod.package_name] = mod;
         }
     return modules;
 }
 
-Module[string] load_modules(IniData config) {
-    auto mods = find_modules(config);
+Module[string] load_modules() {
+    auto mods = find_modules();
     foreach(name, mod; mods) {
         if (mod.has_mod_file())
             mod.read_mod_file(mods);
@@ -228,11 +226,4 @@ string get_package_name(string file, string root_dir) {
     auto rel = relativePath(file, root_dir);
     rel = rel[0..$-2]; // Strip .d
     return join(split(rel, "/"), ".");
-}
-unittest {
-    auto pkg = "/tmp/foo/test.d";
-    assert(get_package_name(pkg, "/tmp") == "foo.test",
-           "Filename.get_package_name failed #1");
-    assert(get_package_name(pkg, "/") == "tmp.foo.test",
-           "Filename.get_package_name failed #2");
 }

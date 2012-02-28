@@ -12,23 +12,21 @@ class Target {
     string[] object_files;
     string[] d_files;
     string output;
-    IniData config;
     Module[] modules;
 
     string[] link_flags; // Shove -lib in here if we're a library
 
-    this(IniData config, Module[] depends, string location) {
-        this.config = config;
+    this(Module[] depends, string location) {
         this.output = location;
         this.modules = depends;
         foreach(dep; depends)
-            this.object_files ~= object_file(config, dep);
+            this.object_files ~= object_file(dep);
     }
     
     string dmd_link_cmdline() {
         string[] args = ["dmd", "-c"];
         args ~= "-of" ~ this.output;
-        args ~= get_user_link_flags(config);
+        args ~= get_user_link_flags();
         args ~= this.link_flags;
         args ~= this.object_files;
         return join(args, " ");
@@ -44,17 +42,17 @@ class Target {
     }
 
     bool link() {
-        if (getbool(config, "ui", "verbose")) {
+        if (getbool(conf, "ui", "verbose")) {
             write("Linking ", relativePath(output, getcwd()), "...");
             stdout.flush();
         }
         debug writeln(dmd_link_cmdline());
         int ok = system(dmd_link_cmdline());
         if (ok == 0) {
-            if (getbool(config, "ui", "verbose"))
+            if (getbool(conf, "ui", "verbose"))
                 writelnc("Ok", COLORS.green);
         } else {
-            if (getbool(config, "ui", "verbose"))
+            if (getbool(conf, "ui", "verbose"))
                 writelnc("Build failed", COLORS.red);
         }
         return ok == 0;
@@ -65,12 +63,12 @@ class Target {
     }
 }
 
-Target[] get_targets(IniData config, Module[string] modules) {
-    string bt = config["internal"]["build_type"];
+Target[] get_targets(Module[string] modules) {
+    string bt = conf["internal"]["build_type"];
     Target[] targs;
-    debug writeln(bt, " ", config.keys);
-    if (bt ~ "_targets" in config) {
-        string[string] globs = config[bt ~ "_targets"];
+    debug writeln(bt, " ", conf.keys);
+    if (bt ~ "_targets" in conf) {
+        string[string] globs = conf[bt ~ "_targets"];
         foreach(glob, target; globs) {
             Module[] targ_mods;
             Module main;
@@ -86,11 +84,11 @@ Target[] get_targets(IniData config, Module[string] modules) {
 
             string output;
             if (main is null)
-                output = buildPath(config["internal"]["root_dir"], "lib", target ~ ".a");
+                output = buildPath(conf["internal"]["root_dir"], "lib", target ~ ".a");
             else
-                output = buildPath(config["internal"]["root_dir"], "bin", target);
+                output = buildPath(conf["internal"]["root_dir"], "bin", target);
             Target targ;
-            targ = new Target(config, targ_mods, output);
+            targ = new Target(targ_mods, output);
             if (main is null)
                 targ.link_flags = ["-lib"];
             targs ~= targ;
@@ -101,9 +99,9 @@ Target[] get_targets(IniData config, Module[string] modules) {
         foreach(root; roots) {
             Target targ;
             if (root.type == MODULE_TYPE.executable)
-                targ = new Target(config, root.imports ~ root, binary_location(config, root));
+                targ = new Target(root.imports ~ root, binary_location(root));
             else
-                targ = new Target(config, root.imports ~ root, library_location(config, root));
+                targ = new Target(root.imports ~ root, library_location(root));
             targs ~= targ;
         }
     }
