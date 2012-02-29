@@ -261,11 +261,11 @@ void parse_args(string[] args) {
             debug writeln("Compile flags: ", args[i+1]);
             // These depend on build_type, so must be parsed later.
             // However, their positional arguments must still be consumed
-            compile_flags = args[i++];
+            compile_flags = args[++i];
             break;
         case "-l", "--link-flags":
             debug writeln("Link flags: ", args[i+1]);
-            link_flags = args[i++];
+            link_flags = args[++i];
             break;
         default:
             if (conf["internal"]["build_type"] == "default" &&
