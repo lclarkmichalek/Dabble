@@ -70,21 +70,25 @@ name of the current build type appended, unless the module
 name is `main`, in which case the executable name will be the name of the
 project (the `core.name` entry in .dabble.conf). However, if a modules
 executable name must be configured, you can add an entry in
-the `<build_type>_targets` section of the `.dabble.conf` file. The
+the `targets` section of the `.dabble.conf` file. The
 following example configures dabble so the `foo` root module will
 generate an executable named `foo_bar` when build with the `release`
 build type:
 
     # .dabble.conf, targets section
-    [release_targets]
+    [targets]
     foo=foo_bar
 
 Glob syntax is also supported. The following will link all the modules
 in the `foo.bar` package into a single binary named `foobar`:
 
     # .dabble.conf
-    [release_targets]
+    [targets]
     foo.bar.*=foobar
+
+If you want to specify targets for a specific build type, rename the
+targets section to `<build_type>_targets`. This will override the
+global targets section.
 
 If targets are specified, then Dabble root detection will not be used
 to find targets.
