@@ -151,6 +151,7 @@ void load_config() {
     conf = get_dabble_conf(root_dir);
     conf_written = timeLastModified(buildPath(root_dir, ".dabble.conf"));
     conf["internal"]["root_dir"] = root_dir;
+    conf["internal"]["build_type"] = "default";
     
     string src_dir;
     if (get(conf, "core", "src_dir") == "") {
@@ -235,4 +236,46 @@ string find_src_dir(string root) {
         return src;
     else
         return root;
+}
+
+void parse_args(string[] args) {
+    if (args.length == 0)
+        return;
+
+    string compile_flags, link_flags;
+    
+    auto len = args.length;
+    for(int i = 0; i < len; i++) {
+        string arg = args[i];
+
+        switch(arg) {
+        case "-v", "--verbose":
+            debug writeln("Verbose");
+            conf["ui"]["verbose"] = "yes";
+            break;
+        case "-q", "--quiet":
+            debug writeln("Quiet");
+            conf["ui"]["verbose"] = "";
+            break;
+        case "-c", "--compile-flags":
+            debug writeln("Compile flags: ", args[i+1]);
+            // These depend on build_type, so must be parsed later.
+            // However, their positional arguments must still be consumed
+            compile_flags = args[i++];
+            break;
+        case "-l", "--link-flags":
+            debug writeln("Link flags: ", args[i+1]);
+            link_flags = args[i++];
+            break;
+        default:
+            if (conf["internal"]["build_type"] == "default" &&
+                arg in conf) {
+                conf["internal"]["build_type"] = arg;
+                debug writeln("BT: ", arg);
+            }
+        }
+    }
+    auto bt = conf["internal"]["build_type"];
+    conf[bt]["compile_flags"] = compile_flags;
+    conf[bt]["link_flags"] = link_flags;
 }

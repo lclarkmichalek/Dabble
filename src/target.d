@@ -93,7 +93,6 @@ Target[] get_targs_from_section(Module[string] modules, string[string] section) 
 Target[] get_targets(Module[string] modules) {
     string bt = conf["internal"]["build_type"];
     Target[] targs;
-    debug writeln(bt, " ", conf.keys);
     if (bt ~ "_targets" in conf)
         targs = get_targs_from_section(modules, conf[bt ~ "_targets"]);
     else if ("targets" in conf)
@@ -110,7 +109,6 @@ Target[] get_targets(Module[string] modules) {
             targs ~= targ;
         }
     }
-    debug writeln(targs);
     return targs;
 }
 

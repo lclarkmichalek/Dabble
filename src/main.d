@@ -21,11 +21,7 @@ int main(string[] args) {
     }
     
     load_config();
-    
-    if (args.length > 1)
-        conf["internal"]["build_type"] = toLower(args[1]);
-    else
-        conf["internal"]["build_type"] = "default";
+    parse_args(args);
 
     if (!bin_exists()) {
         init_bin();
