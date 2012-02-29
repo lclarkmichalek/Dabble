@@ -63,37 +63,42 @@ class Target {
     }
 }
 
+Target[] get_targs_from_section(Module[string] modules, string[string] section) {
+    Target[] targs;
+    foreach(glob, target; section) {
+        Module[] targ_mods;
+        Module main;
+        foreach(name, mod; modules)
+            if (globMatch(name, glob)) {
+                if (mod.type == MODULE_TYPE.executable)
+                    // We're not checking for multiple executables, tut tut
+                    main = mod;
+                targ_mods ~= mod;
+            }
+        
+        string output;
+        if (main is null)
+            output = buildPath(conf["internal"]["root_dir"], "lib", target ~ ".a");
+        else
+            output = buildPath(conf["internal"]["root_dir"], "bin", target);
+        Target targ;
+        targ = new Target(targ_mods, output);
+        if (main is null)
+            targ.link_flags = ["-lib"];
+        targs ~= targ;
+    }
+    return targs;
+}
+
 Target[] get_targets(Module[string] modules) {
     string bt = conf["internal"]["build_type"];
     Target[] targs;
     debug writeln(bt, " ", conf.keys);
-    if (bt ~ "_targets" in conf) {
-        string[string] globs = conf[bt ~ "_targets"];
-        foreach(glob, target; globs) {
-            Module[] targ_mods;
-            Module main;
-            foreach(name, mod; modules)
-                if (globMatch(name, glob)) {
-                    if (mod.errored)
-                        continue;
-                    if (mod.type == MODULE_TYPE.executable)
-                        // We're not checking for multiple executables, tut tut
-                        main = mod;
-                    targ_mods ~= mod;
-                }
-
-            string output;
-            if (main is null)
-                output = buildPath(conf["internal"]["root_dir"], "lib", target ~ ".a");
-            else
-                output = buildPath(conf["internal"]["root_dir"], "bin", target);
-            Target targ;
-            targ = new Target(targ_mods, output);
-            if (main is null)
-                targ.link_flags = ["-lib"];
-            targs ~= targ;
-        }
-    } else {
+    if (bt ~ "_targets" in conf)
+        targs = get_targs_from_section(modules, conf[bt ~ "_targets"]);
+    else if ("targets" in conf)
+        targs = get_targs_from_section(modules, conf["targets"]);
+    else {
         // Autodetect roots
         auto roots = find_roots(modules);
         foreach(root; roots) {
