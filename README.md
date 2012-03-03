@@ -57,10 +57,16 @@ types built in. By default, there are 4 build types availible:
 You can specify the build type to use by passing it's name as the
 first argument to the Dabble executable.
 
-You can add a new built type by adding a section named after it, and
-filling in the `compile_flags` and `link_flags` values.
+You can add a new built type by adding a section named
+`build.<buildtype>`, and filling in the `compile_flags` and
+`link_flags` values.
 
 ### Target configuration
+
+A target is a linked executable or binary; the final product after the
+compiling of the modules.
+
+#### Autodetection
 
 Dabble automatically detects "root" modules; modules that only import other
 modules and are not imported by any modules. These modules are linked aswell
@@ -68,27 +74,31 @@ as compiled, and the generated executable is placed in the `$ROOT_DIR/bin`
 directory. The excutable name will be the name of the module with the
 name of the current build type appended, unless the module
 name is `main`, in which case the executable name will be the name of the
-project (the `core.name` entry in .dabble.conf). However, if a modules
-executable name must be configured, you can add an entry in
-the `targets` section of the `.dabble.conf` file. The
-following example configures dabble so the `foo` root module will
-generate an executable named `foo_bar` when build with the `release`
-build type:
+project (the `core.name` entry in .dabble.conf).
 
-    # .dabble.conf, targets section
-    [targets]
-    foo=foo_bar
+#### Manual specification
 
-Glob syntax is also supported. The following will link all the modules
-in the `foo.bar` package into a single binary named `foobar`:
+One main downside of autodetections is that it usually fails when
+building libraries. To get around this, one can manually specify
+targets. For each target add a section named `target.<targetname>` in
+`.dabble.conf`. In that section you can specify the properties of the
+target. Look at this example for the `.dabble.conf` I use to build
+Derelict3:
 
-    # .dabble.conf
-    [targets]
-    foo.bar.*=foobar
+    [target.libDerelictSDL2]
+    glob=derelict.sdl2.*
 
-If you want to specify targets for a specific build type, rename the
-targets section to `<build_type>_targets`. This will override the
-global targets section.
+The `glob` value is a glob that matches the module names of the
+modules that will be linked to create the target. Later on more
+options will be availible, such as globs of modules to ignore, and
+external libraries to staticly link to etc. etc.
 
-If targets are specified, then Dabble root detection will not be used
-to find targets.
+If you want to specify the targets for a specific build type, add the
+targets you wish build as a csv to the `targets` value in the
+`build.<buildtype>` section. i.e.
+
+    [build.release]
+    targets=target1, target2
+
+If the buildtype section doesn't have a targets entry, all targets
+will be built.
