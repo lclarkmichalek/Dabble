@@ -17,11 +17,12 @@ private {
 
 int main(string[] args) {
     version(unittest) {
-        return;
+        return 0;
     }
     
     load_config();
-    parse_args(args);
+    if (!parse_args(args))
+        return 1;
 
     if (!bin_exists()) {
         init_bin();
@@ -73,6 +74,7 @@ int main(string[] args) {
                     recompiling ~= imp;
         }
     }
+    recompiling = unique(recompiling);
 
     // This needs to be before the stuff is rebuild, else we cannot determin which modules
     // have been rebuilt

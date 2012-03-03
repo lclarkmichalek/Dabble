@@ -5,6 +5,8 @@ private {
     import std.regex;
     import std.array : split;
     import std.string : strip;
+
+    import utils;
 }
 alias string[string][string] IniData;
 
@@ -19,7 +21,7 @@ void write_ini(IniData data, string filename) {
 }
 
 private {
-    string ini_header = r"^\[[\w _\d]+\]$";
+    string ini_header = r"^\[\S+\]$";
     string ini_value = r"^\S+\s*=\s*\S+";
 }
 
@@ -49,6 +51,24 @@ string get(IniData data, string sec, string name, string def="") {
     return data[sec][name];
 }
 
+A getconv(alias conv, A)(IniData data, string sec, string name, A def_)
+    if (is(typeof(conv(name)) == A))
+{
+    if (sec !in data || name !in data[sec])
+        return def;
+    return conv(data[sec][name]);
+ }
+
+string[] getlist(IniData data, string sec, string name, string[] def_) {
+    auto raw = get(data, sec, name, "");
+    if (raw == "")
+        return def_;
+    string[] output;
+    foreach(ind; split(raw, ","))
+        output ~= strip(ind);
+    return output;
+}
+
 bool getbool(IniData data, string sec, string name, bool def=false) {
     if (sec !in data || name !in data[sec])
         return def;
@@ -58,4 +78,3 @@ bool getbool(IniData data, string sec, string name, bool def=false) {
 void set(ref IniData data, string sec, string name, string val) {
     data[sec][name] = val;
 }
-

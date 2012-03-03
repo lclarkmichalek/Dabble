@@ -7,6 +7,7 @@ private {
     
     import ini;
     import mod;
+    import color;
 }
 
 IniData conf;
@@ -31,14 +32,14 @@ void init_dabble_conf(string root) {
     IniData conf;
     conf["core"]["name"] = baseName(root);
 
-    conf["default"]["compile_flags"] = "-inline";
-    conf["default"]["link_flags"] = "-inline";
-    conf["release"]["compile_flags"] = "-inline -release -O";
-    conf["release"]["link_flags"] = "-inline -release -O";
-    conf["debug"]["compile_flags"] = "-debug -g";
-    conf["debug"]["link_flags"] = "-debug -g";
-    conf["unittest"]["compile_flags"] = "-unittest -g";
-    conf["unittest"]["link_flags"] = "-unittest -g";
+    conf["build.default"]["compile_flags"] = "-inline";
+    conf["build.default"]["link_flags"] = "-inline";
+    conf["build.release"]["compile_flags"] = "-inline -release -O";
+    conf["build.release"]["link_flags"] = "-inline -release -O";
+    conf["build.debug"]["compile_flags"] = "-debug -g";
+    conf["build.debug"]["link_flags"] = "-debug -g";
+    conf["build.unittest"]["compile_flags"] = "-unittest -g";
+    conf["build.unittest"]["link_flags"] = "-unittest -g";
     write_ini(conf, buildNormalizedPath(root, ".dabble.conf"));
 }
 
@@ -127,11 +128,11 @@ string object_file(Module mod) {
 }
 
 string get_user_compile_flags() {
-    return get(conf, conf["internal"]["build_type"], "compile_flags");
+    return get(conf, "build." ~ conf["internal"]["build_type"], "compile_flags");
 }
 
 string get_user_link_flags() {
-    return get(conf, conf["internal"]["build_type"], "link_flags");
+    return get(conf, "build." ~ conf["internal"]["build_type"], "link_flags");
 }
 
 void load_config() {
@@ -150,17 +151,18 @@ void load_config() {
     }
     conf = get_dabble_conf(root_dir);
     conf_written = timeLastModified(buildPath(root_dir, ".dabble.conf"));
-    conf["internal"]["root_dir"] = root_dir;
-    conf["internal"]["build_type"] = "default";
     
     string src_dir;
     if (get(conf, "core", "src_dir") == "") {
         src_dir = find_src_dir(root_dir);
-        set(conf, "core", "src_dir", relativePath(src_dir, root_dir));
+        conf["core"]["src_dir"] = relativePath(src_dir, root_dir);
         write_dabble_conf();
     } else
         src_dir = buildNormalizedPath(absolutePath(get(conf, "core", "src_dir"), root_dir));
+    
     conf["internal"]["src_dir"] = src_dir;
+    conf["internal"]["root_dir"] = root_dir;
+    conf["internal"]["build_type"] = "default";
 }
 
 string find_root_dir() {
@@ -238,14 +240,14 @@ string find_src_dir(string root) {
         return root;
 }
 
-void parse_args(string[] args) {
-    if (args.length == 0)
-        return;
+bool parse_args(string[] args) {
+    if (args.length < 2)
+        return true;
 
     string compile_flags, link_flags;
     
     auto len = args.length;
-    for(int i = 0; i < len; i++) {
+    for(int i = 1; i < len; i++) {
         string arg = args[i];
 
         switch(arg) {
@@ -268,8 +270,11 @@ void parse_args(string[] args) {
             link_flags = args[++i];
             break;
         default:
-            if (conf["internal"]["build_type"] == "default" &&
-                arg in conf) {
+            if (conf["internal"]["build_type"] == "default") {
+                if ("build." ~ arg !in conf) {
+                    writelnc("No build config named " ~ arg, COLORS.red);
+                    return false;
+                }
                 conf["internal"]["build_type"] = arg;
                 debug writeln("BT: ", arg);
             }
@@ -278,4 +283,6 @@ void parse_args(string[] args) {
     auto bt = conf["internal"]["build_type"];
     conf[bt]["compile_flags"] = compile_flags;
     conf[bt]["link_flags"] = link_flags;
+    
+    return true;
 }

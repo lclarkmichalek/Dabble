@@ -4,6 +4,7 @@ private {
     import std.process;
     import std.stdio;
     import std.file;
+    import std.string;
     
     import ini, mod, config, color;
 }
@@ -13,14 +14,19 @@ class Target {
     string[] d_files;
     string output;
     Module[] modules;
+    string name;
 
     string[] link_flags; // Shove -lib in here if we're a library
 
-    this(Module[] depends, string location) {
+    this(Module[] depends, string location, string name = "") {
         this.output = location;
         this.modules = depends;
         foreach(dep; depends)
             this.object_files ~= object_file(dep);
+        if (name == "")
+            this.name = baseName(this.output);
+        else
+            this.name = name;
     }
     
     string dmd_link_cmdline() {
@@ -63,9 +69,10 @@ class Target {
     }
 }
 
-Target[] get_targs_from_section(Module[string] modules, string[string] section) {
+Target[] get_targs_from_section(Module[string] modules, string sec_name) {
+    auto section = conf[sec_name];
     Target[] targs;
-    foreach(glob, target; section) {
+    foreach(target, glob; section) {
         Module[] targ_mods;
         Module main;
         foreach(name, mod; modules)
@@ -90,23 +97,79 @@ Target[] get_targs_from_section(Module[string] modules, string[string] section) 
     return targs;
 }
 
+Target load_targ(Module[string] modules, string section_name)
+in {
+    assert(section_name in conf, "Section name was not in config");
+} body {
+    auto section = conf[section_name];
+    string target_name = cast(string)section_name.dup;
+    munch(target_name, "target.");
+    debug writeln("Loading " ~ target_name);
+    if ("glob" !in section) {
+        writelnc("Target " ~ target_name ~ " had no glob value", COLORS.red);
+        return null;
+    }
+    Module[] mods;
+    Module main = null;
+    foreach(mod; modules.values)
+        if (globMatch(mod.package_name, section["glob"])) {
+            mods ~= mod;
+            if (mod.type == MODULE_TYPE.executable)
+                main = mod;
+        }
+    Target targ;
+    if (main is null) {
+        targ = new Target(mods, buildPath(conf["internal"]["root_dir"], "lib",
+                                          target_name ~ ".a"));
+        targ.link_flags ~= "-lib";
+    } else
+        targ = new Target(mods, buildPath(conf["internal"]["root_dir"], "bin",
+                                          target_name));
+    return targ;
+}
+
 Target[] get_targets(Module[string] modules) {
     string bt = conf["internal"]["build_type"];
-    Target[] targs;
-    if (bt ~ "_targets" in conf)
-        targs = get_targs_from_section(modules, conf[bt ~ "_targets"]);
-    else if ("targets" in conf)
-        targs = get_targs_from_section(modules, conf["targets"]);
-    else {
+    Target[] alltargs, targs;
+    foreach(secname; conf.keys) {
+        if (startsWith(secname, "target.")) {
+            auto targ = load_targ(modules, secname);
+            if (targ !is null)
+                alltargs ~= targ;
+        }
+    }
+    auto wanted = getlist(conf, "build." ~ bt, "targets", []);
+    if (alltargs.length != 0) {
+        debug writeln("Found targets: ", alltargs);
+        if (wanted.length == 0)
+            targs = alltargs;
+        else
+            foreach(want; wanted) {
+                bool found = false;
+                foreach(targ; alltargs)
+                    if (targ.name == want) {
+                        found = true;
+                        targs ~= targ;
+                    }
+                if (!found)
+                    writelnc("Could not find target " ~ want, COLORS.red);
+            }
+    } else {
         // Autodetect roots
         auto roots = find_roots(modules);
+        debug writeln("Autodetecting targets, roots: ", roots);
         foreach(root; roots) {
             Target targ;
             if (root.type == MODULE_TYPE.executable)
                 targ = new Target(root.imports ~ root, binary_location(root));
             else
                 targ = new Target(root.imports ~ root, library_location(root));
-            targs ~= targ;
+            if (wanted.length) {
+                foreach(want; wanted)
+                    if (want == targ.name)
+                        targs ~= targ;
+            } else
+                targs ~= targ;
         }
     }
     return targs;

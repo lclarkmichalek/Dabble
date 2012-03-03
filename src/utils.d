@@ -6,7 +6,7 @@ A[] filter(alias pred, A)(A[] input) if (is(typeof(pred(input[0])) == bool)) {
     return output;
 }
 
-B[] filter(alias f, A)(A[] input) if (is(typeof(f(input[0])) == B)) {
+B[] map(alias f, A, B)(A[] input) if (is(typeof(f(input[0])) == B)) {
     B[] output;
     foreach(a; input)
         output ~= f(a);
