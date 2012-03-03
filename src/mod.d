@@ -10,6 +10,7 @@ private {
     import std.string : strip, splitLines;
     import std.process : shell, system;
     import std.exception : ErrnoException;
+    import std.system : os;
     
     import utils;
     import ini;
@@ -53,7 +54,7 @@ public:
         this.filename = filename;
         this.rel_path = relativePath(this.filename, getcwd());
         this.last_modified = timeLastModified(this.filename);
-        this.package_name = get_package_name(filename, get(conf, "internal", "src_dir"));
+        this.package_name = get_package_name(filename);
         this.mod_file = buildNormalizedPath(get(conf, "internal", "root_dir"),
                                             ".dabble", "modules",
                                             package_name ~ "." ~ conf["internal"]["build_type"]);
@@ -202,13 +203,18 @@ pure Module[string] find_roots(Module[string] mods) {
 }
 
 Module[string] find_modules() {
+    auto ignore = get(conf, "os." ~ to!string(os), "ignore", "");
+    
     auto df_iter = dirEntries(get(conf, "internal", "src_dir"), SpanMode.depth);
     Module[string] modules;
-    foreach(string fn; df_iter)
+    foreach(string fn; df_iter) {
+        if (ignore != "" && globMatch(get_package_name(fn), ignore))
+            continue;
         if (extension(fn) == ".d") {
             auto mod = new Module(fn);
             modules[mod.package_name] = mod;
         }
+    }
     return modules;
 }
 
@@ -223,8 +229,8 @@ Module[string] load_modules() {
     return mods;
 }
 
-string get_package_name(string file, string root_dir) {
-    auto rel = relativePath(file, root_dir);
+string get_package_name(string file) {
+    auto rel = relativePath(file, conf["internal"]["src_dir"]);
     rel = rel[0..$-2]; // Strip .d
     return join(split(rel, "/"), ".");
 }
