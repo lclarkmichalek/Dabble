@@ -65,7 +65,7 @@ class Target {
     }
 
     string toString() {
-        return relativePath(this.output, getcwd());
+        return this.name;
     }
 }
 
@@ -104,7 +104,6 @@ in {
     auto section = conf[section_name];
     string target_name = cast(string)section_name.dup;
     munch(target_name, "target.");
-    debug writeln("Loading " ~ target_name);
     if ("glob" !in section) {
         writelnc("Target " ~ target_name ~ " had no glob value", COLORS.red);
         return null;
@@ -119,12 +118,15 @@ in {
         }
     Target targ;
     if (main is null) {
-        targ = new Target(mods, buildPath(conf["internal"]["root_dir"], "lib",
-                                          target_name ~ ".a"));
+        targ = new Target(mods,
+                          buildPath(conf["internal"]["root_dir"], "lib",
+                                    target_name ~ ".a"),
+                          target_name);
         targ.link_flags ~= "-lib";
     } else
-        targ = new Target(mods, buildPath(conf["internal"]["root_dir"], "bin",
-                                          target_name));
+        targ = new Target(mods,
+                          buildPath(conf["internal"]["root_dir"], "bin", target_name),
+                          target_name);
     return targ;
 }
 
