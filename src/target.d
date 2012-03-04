@@ -1,4 +1,6 @@
 private {
+    import core.cpuid;
+    
     import std.array;
     import std.path;
     import std.process;
@@ -6,7 +8,7 @@ private {
     import std.file;
     import std.string;
     
-    import ini, mod, config, color;
+    import ini, mod, config, color, utils;
 }
 
 class Target {
@@ -16,25 +18,36 @@ class Target {
     Module[] modules;
     string name;
 
-    string[] link_flags; // Shove -lib in here if we're a library
+    MODULE_TYPE type;
 
-    this(Module[] depends, string location, string name = "") {
+    this(Module[] depends, string location, MODULE_TYPE type, string name = "") {
         this.output = location;
         this.modules = depends;
         foreach(dep; depends)
             this.object_files ~= object_file(dep);
+        this.object_files = unique(this.object_files);
         if (name == "")
             this.name = baseName(this.output);
         else
             this.name = name;
+        this.type = type;
     }
     
-    string dmd_link_cmdline() {
-        string[] args = ["dmd", "-c"];
-        args ~= "-of" ~ this.output;
-        args ~= get_user_link_flags();
-        args ~= this.link_flags;
-        args ~= this.object_files;
+    string link_cmdline() {
+        string[] args;
+        if (type == MODULE_TYPE.executable) {
+            args = ["gcc", "-Xlinker"];
+            args ~= this.object_files;
+            args ~= ["-o", this.output];
+            args ~= ["-L/usr/lib", "-lphobos2", "-lpthread", "-lm", "-lrt"];
+            
+            args ~= get_user_link_flags();
+        } else {
+            // TODO: Suppress output if !verbose
+            args = ["ar", "-r"];
+            args ~= this.output;
+            args ~= this.object_files;
+        }
         return join(args, " ");
     }
 
@@ -46,14 +59,21 @@ class Target {
                 return true;
         return false;
     }
-
+    
     bool link() {
+        if (exists(output)) {
+            if (getbool(conf, "ui", "verbose"))
+                writeln("Deleating old target");
+            remove(output);
+        }
+        
         if (getbool(conf, "ui", "verbose")) {
             write("Linking ", relativePath(output, getcwd()), "...");
             stdout.flush();
         }
-        debug writeln(dmd_link_cmdline());
-        int ok = system(dmd_link_cmdline());
+        
+        debug writeln(link_cmdline());
+        int ok = system(link_cmdline());
         if (ok == 0) {
             if (getbool(conf, "ui", "verbose"))
                 writelnc("Ok", COLORS.green);
@@ -67,34 +87,6 @@ class Target {
     string toString() {
         return this.name;
     }
-}
-
-Target[] get_targs_from_section(Module[string] modules, string sec_name) {
-    auto section = conf[sec_name];
-    Target[] targs;
-    foreach(target, glob; section) {
-        Module[] targ_mods;
-        Module main;
-        foreach(name, mod; modules)
-            if (globMatch(name, glob)) {
-                if (mod.type == MODULE_TYPE.executable)
-                    // We're not checking for multiple executables, tut tut
-                    main = mod;
-                targ_mods ~= mod;
-            }
-        
-        string output;
-        if (main is null)
-            output = buildPath(conf["internal"]["root_dir"], "lib", target ~ ".a");
-        else
-            output = buildPath(conf["internal"]["root_dir"], "bin", target);
-        Target targ;
-        targ = new Target(targ_mods, output);
-        if (main is null)
-            targ.link_flags = ["-lib"];
-        targs ~= targ;
-    }
-    return targs;
 }
 
 Target load_targ(Module[string] modules, string section_name)
@@ -121,11 +113,12 @@ in {
         targ = new Target(mods,
                           buildPath(conf["internal"]["root_dir"], "lib",
                                     target_name ~ ".a"),
+                          MODULE_TYPE.library,
                           target_name);
-        targ.link_flags ~= "-lib";
     } else
         targ = new Target(mods,
                           buildPath(conf["internal"]["root_dir"], "bin", target_name),
+                          MODULE_TYPE.executable,
                           target_name);
     return targ;
 }
@@ -163,9 +156,13 @@ Target[] get_targets(Module[string] modules) {
         foreach(root; roots) {
             Target targ;
             if (root.type == MODULE_TYPE.executable)
-                targ = new Target(root.imports ~ root, binary_location(root));
+                targ = new Target(root.imports ~ root,
+                                  binary_location(root),
+                                  MODULE_TYPE.executable);
             else
-                targ = new Target(root.imports ~ root, library_location(root));
+                targ = new Target(root.imports ~ root,
+                                  library_location(root),
+                                  MODULE_TYPE.library);
             if (wanted.length) {
                 foreach(want; wanted)
                     if (want == targ.name)
